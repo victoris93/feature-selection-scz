@@ -1,5 +1,5 @@
-
 from hcp_class_alignment import *
+from icc_utils import *
 import sys
 import numpy as np 
 import nibabel as nib 
@@ -11,56 +11,47 @@ from pingouin import intraclass_corr
 
 subj=sys.argv[1]
 subj_inst=hcp_subj(subj,4)
+labs_L_32k = nib.load('HCP/labels/fsLR.32k.L.label.gii').agg_data() # loading labels resampled with 2 diff. techniques
+labs_R_32k = nib.load('HCP/labels/fsLR.32k.R.labelc.gii').agg_data()
+labs_4k_metric  = np.concatenate((labs_L_32k, labs_R_32k))
 
-def gradDispersion(grads_ses1_aligned, grads_ses2_aligned, save = False, file_name = None):
-    if grads_ses1_aligned != None:
-        vd_subject_list_ses1 = []
-        for subject_grads in grads_ses1_aligned:
-            vertex_coords = subject_grads.T
-            vertex_nbrs = NearestNeighbors(n_neighbors=500, algorithm='brute').fit(vertex_coords)
-            distances, indices = vertex_nbrs.kneighbors(vertex_coords)
-            mean_distances = distances.mean(axis = 1)
-            vd_subject_list_ses1.append(mean_distances)
-        vd_ses1 = np.asarray(vd_subject_list_ses1)
-    else:
-        pass
+### Get aligned gradients ###
+grads_ses1_aligned = subj_inst.Gradsses1Aligned
+grads_ses2_aligned = subj_inst.Gradsses2Aligned
 
-    if grads_ses2_aligned != None:
-        vd_subject_list_ses2 = []
-        for subject_grads in grads_ses2_aligned:
-            vertex_coords = subject_grads.T
-            vertex_nbrs = NearestNeighbors(n_neighbors=500, algorithm='brute').fit(vertex_coords)
-            distances, indices = vertex_nbrs.kneighbors(vertex_coords)
-            mean_distances = distances.mean(axis = 1)
-            vd_subject_list_ses2.append(mean_distances)
-        vd_ses2 = np.asarray(vd_subject_list_ses2)
-    else:
-        pass
-    vd_list = [vd_ses1, vd_ses2]
-    if save == True:
-        vd_array = np.stack((vd_list))
-        np.save(arr = vd_array, file = file_name + ".npy")
-    return vd_list
+neighbours = [50, 100, 200, 400, 800, 1600]
+gradDisp_df_diff_neighbours = []
+for n_neighbours in neighbours:
+    gradDispAllSessions = gradDispersion(grads_ses1_aligned, grads_ses1_aligned)
 
-def make_measure_df(measure_array, measure_name, subjects, session):
-    measure_df = pd.DataFrame(measure_array[0], columns = [measure_name])
-    measure_df["Subject"] = subjects[0]
-    measure_df["Session"] = session
-    measure_df["Vertex"] = np.arange(len(measure_df[0]))
-    for subject, array in zip(subjects[1:], measure_df):
-        df = pd.DataFrame(array, columns = ["Dispersion"])
-        df["Subject"] = subject
-        df["Session"] = 2
-        df["Vertex"] = np.arange(len(array))
-        measure_df = pd.concat([measure_df, df])
-        
-def vertexICC(measure_df, ICC_type = "ICC2"):
-    vertices = np.arange(len(measure_df[0]))
-    vertex_wise_ICC = []
-    for vertex in vertices:
-        data = measure_df[measure_df["Vertex"] == vertex]
-        ICC = intraclass_corr(data, targets = "Subject", raters = "Session", ratings = "Dispersion")
-        ICC["Vertex"] = vertex
-        vertex_wise_ICC.append(ICC[ICC["Type"] == ICC_type])
-    vertex_wise_ICC = pd.concat(vertex_wise_ICC)
-    return vertex_wise_ICC
+    gradDisp_ses1 = gradDispAllSessions[0]
+    gradDisp_ses2 = gradDispAllSessions[1]
+
+    gradDisp_ses1_df = make_measure_df(gradDisp_ses1, "Dispersion", subjects = subj, session = 1)
+    gradDisp_ses2_df = make_measure_df(gradDisp_ses2, "Dispersion", subjects = subj, session = 2)
+    
+    gradDisp_df = pd.concat([gradDisp_ses1_df, gradDisp_ses2_df])
+    gradDisp_df["Neighbours"] = n_neighbours
+    gradDisp_df_diff_neighbours.append(gradDisp_df)
+gradDisp_df_diff_neighbours = pd.concat(gradDisp_df_diff_neighbours)
+gradDisp_df_diff_neighbours.to_csv("gradDisp_df_diff_neighbours.csv")
+
+### Compute gradient dispersion ###
+#dispersion = gradDispersion(grads_ses1_aligned, grads_ses2_aligned, n_neighbours = 2000, save = True, file_name = "gradDispersion32k")
+#d_ses1 = dispersion[0]
+#vd_ses2 = dispersion[1]
+
+#vd_ses1_df = make_measure_df(measure_array = vd_ses1, measure_name = "Dispersion", subjects = subj, session =1)
+#vd_ses2_df = make_measure_df(measure_array = vd_ses2, measure_name = "Dispersion", subjects = subj, session =2)
+
+#vd_df = pd.concat([vd_ses1_df, vd_ses2_df])
+### Computing vertex-wise ICC ###
+
+vertex_wise_ICC_diff_neighbours = []
+for n_neighbours in neighbours:
+    Disp_df = gradDisp_df_diff_neighbours[gradDisp_df_diff_neighbours["Neighbours"] == n_neighbours]
+    vertex_wise_ICC = vertexICC(Disp_df, ICC_type = "ICC2")
+    vertex_wise_ICC_diff_neighbours.append(vertex_wise_ICC)
+vertex_wise_ICC_diff_neighbours = pd.concat(vertex_wise_ICC_diff_neighbours)
+
+vertex_wise_ICC_diff_neighbours.to_csv("vertex_wise_ICC_diff_neighbours.csv")

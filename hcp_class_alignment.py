@@ -135,8 +135,9 @@ class hcp_subj:
             ######### Aligned gradients w/ Procrustes
             self.AllGrads = np.concatenate((self.gradses1[0], self.gradses2[0]))
 
+            group_grad = np.load(f'{clusterPath}/group.mapalign.diffmaps.0{kernel}mm.npy') # assumption
             alignment = ProcrustesAlignment()
-            self.allGradsAlignedObject = alignment.fit(self.AllGrads, self.AllGrads[0]) #the first subject of the 1st session as a reference
+            self.allGradsAlignedObject = alignment.fit(self.AllGrads, group_grad) # aligning to the group gradient (from the average conn matrix)
             self.allGradsAligned = self.allGradsAlignedObject.aligned_
 
             self.Gradsses1Aligned = self.allGradsAligned[:int(len(self.allGradsAligned)/2)]
