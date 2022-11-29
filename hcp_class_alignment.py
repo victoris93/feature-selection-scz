@@ -1,4 +1,3 @@
-
 import numpy as np 
 import nibabel as nib 
 import pandas as pd
@@ -135,9 +134,9 @@ class hcp_subj:
             ######### Aligned gradients w/ Procrustes
             self.AllGrads = np.concatenate((self.gradses1[0], self.gradses2[0]))
 
-            group_grad = np.load(f'{clusterPath}/group.mapalign.diffmaps.0{kernel}mm.npy') # assumption
+            margulies_grads = np.load(f'{clusterPath}/margulies_grads_32k.npy') # 3 grads margulies 2016
             alignment = ProcrustesAlignment()
-            self.allGradsAlignedObject = alignment.fit(self.AllGrads, group_grad) # aligning to the group gradient (from the average conn matrix)
+            self.allGradsAlignedObject = alignment.fit(self.AllGrads, margulies_grads) # aligning to margulies 2016
             self.allGradsAligned = self.allGradsAlignedObject.aligned_
 
             self.Gradsses1Aligned = self.allGradsAligned[:int(len(self.allGradsAligned)/2)]
