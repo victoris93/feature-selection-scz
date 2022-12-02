@@ -5,10 +5,12 @@ import sys
 import numpy as np 
 import nibabel as nib 
 import pandas as pd
-import matplotlib.pyplot as plt
-from surfplot.plotting import Plot
+import os
 from sklearn.neighbors import NearestNeighbors
 from pingouin import intraclass_corr
+
+os.system("mkdir clinical_grads")
+os.system("mkdir clinical_grads/results")
 
 parser = argparse.ArgumentParser(description='Embeds functional Connectivity Matrix using PCA and diffusion map embedding, and then determines how far peaks are across sessions of the same subject',\
 	usage='vertex_ICC_32k.py --subj <subject list> --odir <output directory> ',\
