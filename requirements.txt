@@ -1,0 +1,13 @@
+numpy
+pandas
+nibabel
+sklearn
+pingouin
+brainspace
+gdist
+cython
+subprocess
+scipy
+pickle
+neuromaps
+nilearn

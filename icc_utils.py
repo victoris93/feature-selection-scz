@@ -4,8 +4,6 @@ import sys
 import numpy as np 
 import nibabel as nib 
 import pandas as pd
-import matplotlib.pyplot as plt
-from surfplot.plotting import Plot
 from sklearn.neighbors import NearestNeighbors
 from pingouin import intraclass_corr
 
