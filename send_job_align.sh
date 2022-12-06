@@ -1,22 +1,24 @@
 #!/bin/bash 
 
 #SBATCH --job-name=GradAlign
+#SBATCH -o ./logs/GradAlign-%j.out
 #SBATCH -p short
-#$ -t 1-527:1
+#SBATCH --constraint="skl-compat"
+#SBATCH --cpus-per-task=2
+#SBATCH --requeue
+#$ -t 1-5
+SUBJECT_LIST=./SubjectsCompleteData.txt
 
 # I want the job to take 3 gradients of all 900 subjects, align them to Margulies 2016 and compite ICC for each vertex abd value of neighbours. Returns a huge csv with results, a long dataframe
 module load Python/3.9.6-GCCcore-11.2.0 #do I need to do this with some packages/modules? install pingouin
-source </victorias env>
+source /well/margulies/users/mnk884/Victoria/ClinicalGradients-skl/bin/activate
 
-echo "------------------------------------------------"
-echo "Run on host: "hostname
-echo "Operating system: "uname -s
-echo "Username: "whoami
-echo "Started at: "date
-echo "------------------------------------------------"
+mkdir -p /well/margulies/projects/clinical_grads/Results
+output_path=/well/margulies/projects/clinical_grads/Results
 
-output_path = /well/margulies/projects/clinical_grads/Results
+echo the job id is $SLURM_ARRAY_JOB_ID
+FILENAME=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $SUBJECT_LIST)
+echo echo $SLURM_ARRAY_JOB_ID
+echo "Processing subject $FILENAME"
 
-for subject in 'cat SubjectsCompleteData.txt';do
-    python3 -u hcp_class_alignment.py $subject $output_path
-done
+python3 -u hcp_class_alignment.py $FILENAME  $output_path
