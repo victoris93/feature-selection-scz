@@ -21,4 +21,4 @@ FILENAME=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $SUBJECT_LIST)
 echo echo $SLURM_ARRAY_JOB_ID
 echo "Processing subject $FILENAME"
 
-python3 -u hcp_class_alignment.py $FILENAME  $output_path
+python3 -u alignment.py $FILENAME  $output_path
