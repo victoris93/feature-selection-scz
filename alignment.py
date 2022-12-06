@@ -10,9 +10,6 @@ odir = sys.argv[2]
 kernel = 4
         
 clusterPath='/well/margulies/projects/data/hcpGrads'
-anatNatPath=f'/well/win-hcp/HCP-YA/subjectsAll/{subj}/T1w/Native'
-anat32Path=f'/well/win-hcp/HCP-YA/subjectsAll/{subj}/T1w/fsaverage_LR32k'
-MNIpath=f'/well/win-hcp/HCP-YA/subjectsAll/{subj}/MNINonLinear/fsaverage_LR32k'
 
 margulies_grads = np.load(f'{clusterPath}/margulies_grads_32k.npy') # 3 grads margulies 2016
 alignment = ProcrustesAlignment()
