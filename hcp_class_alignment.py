@@ -92,7 +92,7 @@ class hcp_subj:
 
 
             self.Rgrad=self.grad[0][len(self.Lfill):]
-            self.Rgrad=recort(self.Rgrad,self.Rfill,self.dimssry)
+            self.Rgrad=recort(self.Rgrad,self.Rfill,self.dims)
 
             ###### session 1 
             ### subsessions
