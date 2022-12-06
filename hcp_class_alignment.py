@@ -2,6 +2,7 @@ import numpy as np
 import nibabel as nib 
 import pandas as pd
 import pickle
+import sys
 from brainspace.gradient.alignment import ProcrustesAlignment
 
 ### UTILS ###
@@ -91,7 +92,7 @@ class hcp_subj:
 
 
             self.Rgrad=self.grad[0][len(self.Lfill):]
-            self.Rgrad=recort(self.Rgrad,self.Rfill,self.dimssry )
+            self.Rgrad=recort(self.Rgrad,self.Rfill,self.dimssry)
 
             ###### session 1 
             ### subsessions
@@ -154,6 +155,16 @@ class hcp_subj:
             self.Rgradses2Aligned=self.Gradsses2Aligned[len(self.Rfill):]
             self.Rgradses2Aligned=recort(self.Rgradses2Aligned,self.Rfill,self.dims)
 
+
+
     def print_subj(self):
         print(self.subj)
 
+if __name__ == "__main__":
+    subj = sys.argv[1]
+    odir = sys.argv[2]
+    hcp_subject_obj = hcp_subj(subj, 4)
+    filname = odir + "/hcp_objects.pkl"
+    filehandler = open(filname, 'wb') 
+    pickle.dump(hcp_subject_obj, filehandler)
+    filehandler.close()
