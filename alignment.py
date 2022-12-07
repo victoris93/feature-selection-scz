@@ -1,4 +1,5 @@
 import numpy as np 
+import os
 import nibabel as nib 
 import pandas as pd
 import pickle
@@ -23,6 +24,12 @@ print(margulies_grads.shape)
 
 allGradsAlignedObject = alignment.fit(AllGrads, margulies_grads) # aligning to margulies 2016
 allGradsAligned = allGradsAlignedObject.aligned_
-filename = odir +  "/%s_aligned_grads.npy" % subj
 
-np.save(arr = allGradsAligned, file = filename)
+arrayExists = os.path.exists("{odir}/aligned_grads.npy")
+
+if not arrayExists:
+    np.save(arr = allGradsAligned, file = "{odir}/aligned_grads.npy")
+else:
+    previous_aligned_grads = np.load("{odir}/aligned_grads.npy")
+    all_grads = np.concatenate((previous_aligned_grads, allGradsAligned))
+    np.save(arr = all_grads, file = "{odir}/aligned_grads.npy")
