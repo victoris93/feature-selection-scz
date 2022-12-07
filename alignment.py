@@ -13,7 +13,7 @@ kernel = 4
 clusterPath='/well/margulies/projects/data/hcpGrads'
 
 margulies_grads = np.load(f'{clusterPath}/margulies_grads_32k.npy') # 3 grads margulies 2016
-alignment = ProcrustesAlignment()
+alignment = ProcrustesAlignment(verbose=True)
 
 gradses1=np.load(f'{clusterPath}/{subj}/{subj}.mapalign.ses1.diffmap.s0{kernel}mm.npy')
 gradses2=np.load(f'{clusterPath}/{subj}/{subj}.mapalign.ses2.s0{kernel}mm.diffmap.npy')

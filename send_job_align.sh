@@ -6,7 +6,7 @@
 #SBATCH --constraint="skl-compat"
 #SBATCH --cpus-per-task=6
 #SBATCH --requeue
-#SBATCH --array 1-5:1
+#SBATCH --array 1-1018:1
 SUBJECT_LIST=./SubjectsCompleteData.txt
 
 # I want the job to take 3 gradients of all 900 subjects, align them to Margulies 2016 and compite ICC for each vertex abd value of neighbours. Returns a huge csv with results, a long dataframe
