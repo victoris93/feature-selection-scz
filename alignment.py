@@ -23,6 +23,6 @@ print(margulies_grads.shape)
 
 allGradsAlignedObject = alignment.fit(AllGrads, margulies_grads) # aligning to margulies 2016
 allGradsAligned = allGradsAlignedObject.aligned_
-filename = odir +  "%s_aligned_grads.npy" % subj
+filename = odir +  "/%s_aligned_grads.npy" % subj
 
 np.save(arr = allGradsAligned, file = filename)
