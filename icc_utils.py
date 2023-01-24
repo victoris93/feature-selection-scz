@@ -1,54 +1,33 @@
-
-from hcp_class_alignment import *
 import sys
 import numpy as np 
-import nibabel as nib 
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 from pingouin import intraclass_corr
 
-def gradDispersion(grads_ses1, grads_ses2,n_neighbours, save = False, filename = None):
-    if grads_ses1 != None:
-        vd_subject_list_ses1 = []
-        for subject_grads in grads_ses1:
-            vertex_coords = subject_grads.T
-            vertex_nbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(vertex_coords)
-            distances, indices = vertex_nbrs.kneighbors(vertex_coords)
-            mean_distances = distances.mean(axis = 1)
-            vd_subject_list_ses1.append(mean_distances)
-        vd_ses1 = np.asarray(vd_subject_list_ses1)
-    else:
-        vd_ses1 = None
+def gradDispersion(grads_ses1, grads_ses2, n_neighbours, save = False, filename = None):
 
-    if grads_ses2 != None:
-        vd_subject_list_ses2 = []
-        for subject_grads in grads_ses2:
-            vertex_coords = subject_grads.T
-            vertex_nbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(vertex_coords)
-            distances, indices = vertex_nbrs.kneighbors(vertex_coords)
-            mean_distances = distances.mean(axis = 1)
-            vd_subject_list_ses2.append(mean_distances)
-        vd_ses2 = np.asarray(vd_subject_list_ses2)
-    else:
-        vd_ses2 = None
-    vd_list = [vd_ses1, vd_ses2]
-    if save == True:
-        vd_array = np.stack((vd_list))
-        np.save(arr = vd_array, file = filename)
-    return vd_list
+    vertex_nbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(grads_ses1)
+    distances, indices = vertex_nbrs.kneighbors(grads_ses1)
+    vd_ses1 = distances.mean(axis = 1)
 
-def make_measure_df(measure_array, measure_name, subjects, session):
-    measure_df = pd.DataFrame(measure_array[0], columns = [measure_name])
-    measure_df["Subject"] = subjects[0]
-    measure_df["Session"] = session
-    measure_df["Vertex"] = np.arange(len(measure_df[0]))
-    for subject, array in zip(subjects[1:], measure_df):
-        df = pd.DataFrame(array, columns = ["Dispersion"])
-        df["Subject"] = subject
-        df["Session"] = session
-        df["Vertex"] = np.arange(len(array))
-        measure_df = pd.concat([measure_df, df])
+    vertex_nbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(grads_ses2)
+    distances, indices = vertex_nbrs.kneighbors(grads_ses2)
+    vd_ses2 = distances.mean(axis = 1)
         
+    vd = np.asarray([vd_ses1, vd_ses2])
+    if save == True:
+        np.save(arr = vd, file = filename)
+    return vd
+
+def make_measure_df(measure_array, measure_name, subject, session, save = False, filename = None):
+    measure_df = pd.DataFrame(measure_array, columns = [measure_name])
+    measure_df["Subject"] = subject
+    measure_df["Session"] = session
+    measure_df["Vertex"] = np.arange(len(measure_df))
+    if save == True:
+        measure_df.to_csv(f"{filename}")
+    return measure_df
+     
 def vertexICC(measure_df, ICC_type = "ICC2"):
     vertices = np.arange(len(measure_df[0]))
     vertex_wise_ICC = []
