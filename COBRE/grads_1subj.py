@@ -3,6 +3,7 @@ import brainspace
 import numpy as np
 from nilearn import signal
 from brainspace.gradient import GradientMaps
+import hcp_utils as hcp
 from nilearn.interfaces.fmriprep import load_confounds_strategy
 
 def get_corticalVertices(data):
@@ -31,12 +32,11 @@ confounds_out = np.concatenate([confounds_out_s1[0], confounds_out_s2[0]])
 all_ts = np.concatenate([subj_surf_ts_s1, subj_surf_ts_s2])
 clean_ts = signal.clean(all_ts, confounds = confounds_out)
 
-cortex_indices = get_corticalVertices("%s/ses-20100101/func/sub-A00000541_ses-20100101_task-rest_space-fsLR_den-91k_bold.dtseries.nii" %clusterPath)
+cortex_clean_ts_labeled = np.array([hcp.cortex_data(i) for i in clean_ts])
+mask = (cortex_clean_ts_labeled != 0).any(axis=0)
+cortex_clean_ts = cortex_clean_ts_labeled[:, mask]
+print("Shape of clean timeseries: ", cortex_clean_ts.shape)
 
-clean_ts_L = clean_ts[:, :len(cortex_indices["lIDX"])]
-clean_ts_R = clean_ts[:, len(cortex_indices["lIDX"]):len(cortex_indices["lIDX"])+len(cortex_indices["rIDX"])]
-
-cortex_clean_ts = np.concatenate([clean_ts_L, clean_ts_R], axis = 1)
 correlation_matrix = np.corrcoef(cortex_clean_ts.T)
 np.save(arr = correlation_matrix, file = "output/corr_mat_A00038624.npy")
 print("Corr matrix saved")
@@ -53,6 +53,3 @@ gm_cosine.fit(correlation_matrix)
 np.save(arr = np.asarray(gm_cosine.gradients_.T), file = "output/grads_A00038624_cosine.npy")
 del gm_cosine
 print("Cosine kernel gradients extracted successfully")
-
-
-
