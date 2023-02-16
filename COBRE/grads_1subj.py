@@ -6,38 +6,24 @@ from brainspace.gradient import GradientMaps
 import hcp_utils as hcp
 from nilearn.interfaces.fmriprep import load_confounds_strategy
 
-def get_corticalVertices(data):
-	""" Get indices of Cortex Data from cifti file """
-	cifti=nib.load(data)
-	structMap=cifti.header.get_index_map(1)
-	brainModels=list(structMap.brain_models)
-	LCrtBM=brainModels[0]
-	Lcrt_vrts=np.array(LCrtBM.vertex_indices)
-	LnumVerts=LCrtBM.surface_number_of_vertices
-	
-	RCrtBM=brainModels[1]
-	Rcrt_vrts=np.array(RCrtBM.vertex_indices)
-	RnumVerts=RCrtBM.surface_number_of_vertices
-	
-	return {'lIDX':Lcrt_vrts,'lnverts':LnumVerts,'rIDX':Rcrt_vrts,'rnverts':RnumVerts}
-	
+cortex_indices = np.concatenate((hcp.vertex_info["grayl"], hcp.vertex_info["grayr"] + 32492))
 
-clusterPath = "/well/margulies/projects/data/COBRE/derivatives/fmriprep/sub-A00000541"
-subj_surf_ts_s1 = nib.load("%s/ses-20100101/func/sub-A00000541_ses-20100101_task-rest_space-fsLR_den-91k_bold.dtseries.nii" %clusterPath).get_fdata()
-subj_surf_ts_s2 = nib.load("%s/ses-20110101/func/sub-A00000541_ses-20110101_task-rest_space-fsLR_den-91k_bold.dtseries.nii" %clusterPath).get_fdata()
-confounds_out_s1 = load_confounds_strategy("%s/ses-20100101/func/sub-A00000541_ses-20100101_task-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz" %clusterPath, denoise_strategy = "simple")
-confounds_out_s2 = load_confounds_strategy("%s/ses-20110101/func/sub-A00000541_ses-20110101_task-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz" %clusterPath, denoise_strategy = "simple")
-confounds_out = np.concatenate([confounds_out_s1[0], confounds_out_s2[0]])
+smoothed_cln_ts_s1_Lcortex = np.asarray(nib.load("smoothed/A00038624.010mm.L.ses1.dtseries.func.gii").agg_data())
+smoothed_cln_ts_s1_Rcortex = np.asarray(nib.load("smoothed/A00038624.010mm.R.ses1.dtseries.func.gii").agg_data())
+smoothed_cln_ts_s1_cortex = np.concatenate([smoothed_cln_ts_s1_Lcortex, smoothed_cln_ts_s1_Rcortex], axis = 1)
 
-all_ts = np.concatenate([subj_surf_ts_s1, subj_surf_ts_s2])
-clean_ts = signal.clean(all_ts, confounds = confounds_out)
+smoothed_cln_ts_s2_Lcortex = np.asarray(nib.load("smoothed/A00038624.010mm.L.ses2.dtseries.func.gii").agg_data())
+smoothed_cln_ts_s2_Rcortex = np.asarray(nib.load("smoothed/A00038624.010mm.R.ses2.dtseries.func.gii").agg_data())
+smoothed_cln_ts_s2_cortex = np.concatenate([smoothed_cln_ts_s2_Lcortex, smoothed_cln_ts_s2_Rcortex], axis = 1)
 
-cortex_clean_ts_labeled = np.array([hcp.cortex_data(i) for i in clean_ts])
-mask = (cortex_clean_ts_labeled != 0).any(axis=0)
-cortex_clean_ts = cortex_clean_ts_labeled[:, mask]
-print("Shape of clean timeseries: ", cortex_clean_ts.shape)
+smoothed_cln_ts = np.row_stack([smoothed_cln_ts_s1_cortex, smoothed_cln_ts_s2_cortex])
+smoothed_cln_ts = smoothed_cln_ts[:, cortex_indices]
 
-correlation_matrix = np.corrcoef(cortex_clean_ts.T)
+#mask = (smoothed_cln_ts != 0).any(axis=0)
+#cortex_clean_ts = cortex_clean_ts_labeled[:, mask]
+#print("Shape of clean timeseries: ", cortex_clean_ts.shape)
+
+correlation_matrix = np.corrcoef(smoothed_cln_ts.T)
 np.save(arr = correlation_matrix, file = "output/corr_mat_A00038624.npy")
 print("Corr matrix saved")
 
