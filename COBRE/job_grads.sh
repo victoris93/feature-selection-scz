@@ -1,6 +1,6 @@
 #!/bin/bash 
-#SBATCH --job-name=CosineGrads
-#SBATCH -o ./logs/CosineGrads-%j.out
+#SBATCH --job-name=GradAnalysis
+#SBATCH -o ./logs/GradAnalysis-%j.out
 #SBATCH -p short
 #SBATCH --constraint="skl-compat"
 #SBATCH --cpus-per-task=10
