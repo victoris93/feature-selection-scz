@@ -9,7 +9,7 @@ from nilearn.interfaces.fmriprep import load_confounds_strategy
 cortex_indices = np.concatenate((hcp.vertex_info["grayl"], hcp.vertex_info["grayr"] + 32492))
 smoothed_cln_ts = np.asarray(nib.load("smoothed/A00038624.010mm.z.dtseries.func.gii").agg_data())
 
-print("Shape of timeseires: " smoothed_cln_ts.shape)
+print("Shape of timeseires: ", smoothed_cln_ts.shape)
 smoothed_cln_ts = smoothed_cln_ts[:, cortex_indices]
 
 #mask = (smoothed_cln_ts != 0).any(axis=0)
