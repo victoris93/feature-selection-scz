@@ -7,16 +7,9 @@ import hcp_utils as hcp
 from nilearn.interfaces.fmriprep import load_confounds_strategy
 
 cortex_indices = np.concatenate((hcp.vertex_info["grayl"], hcp.vertex_info["grayr"] + 32492))
+smoothed_cln_ts = np.asarray(nib.load("smoothed/A00038624.010mm.z.dtseries.func.gii").agg_data())
 
-smoothed_cln_ts_s1_Lcortex = np.asarray(nib.load("smoothed/A00038624.010mm.L.ses1.dtseries.func.gii").agg_data())
-smoothed_cln_ts_s1_Rcortex = np.asarray(nib.load("smoothed/A00038624.010mm.R.ses1.dtseries.func.gii").agg_data())
-smoothed_cln_ts_s1_cortex = np.concatenate([smoothed_cln_ts_s1_Lcortex, smoothed_cln_ts_s1_Rcortex], axis = 1)
-
-smoothed_cln_ts_s2_Lcortex = np.asarray(nib.load("smoothed/A00038624.010mm.L.ses2.dtseries.func.gii").agg_data())
-smoothed_cln_ts_s2_Rcortex = np.asarray(nib.load("smoothed/A00038624.010mm.R.ses2.dtseries.func.gii").agg_data())
-smoothed_cln_ts_s2_cortex = np.concatenate([smoothed_cln_ts_s2_Lcortex, smoothed_cln_ts_s2_Rcortex], axis = 1)
-
-smoothed_cln_ts = np.row_stack([smoothed_cln_ts_s1_cortex, smoothed_cln_ts_s2_cortex])
+print("Shape of timeseires: " smoothed_cln_ts.shape)
 smoothed_cln_ts = smoothed_cln_ts[:, cortex_indices]
 
 #mask = (smoothed_cln_ts != 0).any(axis=0)
