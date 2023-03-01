@@ -1,6 +1,5 @@
 import os, sys
 import numpy as np
-import pandas as pd
 from hyppo.discrim import DiscrimOneSample
 
 #N_Neighbours = [50, 100, 200, 400, 800, 1600, 3200, 6400, 12800]
@@ -11,7 +10,7 @@ n_neighbours = sys.argv[1]
 #ses_2_labs = np.stack((subjects, np.ones(500)), axis = 1)
 #ses_labels = np.concatenate((ses_1_labs, ses_2_labs))
 
-ses_labels = np.concatenate([np.zeros(500), np.ones(500)], axis=0)
+ses_labels = np.concatenate([np.zeros(1018), np.ones(1018)], axis=0)
 
 odir=r'/gpfs3/well/margulies/users/cpy397/DispersionResults'
 
