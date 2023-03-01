@@ -32,18 +32,18 @@ def impute_nans(dataframe, pick_columns = None):
         df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)
     return df_no_nans
 
-def get_confounds(subject, session_names, no_nans = True):
+def get_confounds(subject, session_names, no_nans = True, pick_columns = None):
     confounds = []
     confounds_file_ses1 = f'sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}_task-rest_desc-confounds_timeseries.tsv'
     confounds_out_s1 = pd.read_csv(confounds_file_ses1, sep = '\t')
     if no_nans == True:
-        confounds_out_s1 = impute_nans(confounds_out_s1)
+        confounds_out_s1 = impute_nans(confounds_out_s1, pick_columns = pick_columns)
     confounds.append(confounds_out_s1)
     if len(session_names) > 1:
         confounds_file_ses2 = f'sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}_task-rest_desc-confounds_timeseries.tsv'
         confounds_out_s2 = pd.read_csv(confounds_file_ses2, sep = '\t')
         if no_nans == True:
-            confounds_out_s2 = impute_nans(confounds_out_s2)
+            confounds_out_s2 = impute_nans(confounds_out_s2, pick_columns = pick_columns)
         confounds.append(confounds_out_s2)
     else:
         confounds_out_s2 = None
@@ -70,23 +70,21 @@ def clean_signal(parc_ts_list):
     return clean_ts
 
 session_names = get_sessions(subject)
+picked_confounds = np.loadtxt('confounds.txt', dtype = 'str')
+confounds = get_confounds(subject, session_names, pick_columns = picked_confounds)
 
 subject_ts_paths = []
+
 subj_ts_s1 = f'sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
 subject_ts_paths.append(subj_ts_s1)
 if len(session_names) > 1:
     subj_ts_s2 = f'sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
     subject_ts_paths.append(subj_ts_s2)
 
+parcellated_ts = parcellate(subject_ts_paths, confounds)
+clean_parcellated_ts = clean_signal(parcellated_ts)
 
-confounds_file = 'sub-A00018979/ses-20100101/func/sub-A00018979_ses-20100101_task-rest_desc-confounds_timeseries.tsv'
-confounds_out_s1 = pd.read_csv(confounds_file, sep = '\t')
-confounds_file = 'sub-A00018979/ses-20110101/func/sub-A00018979_ses-20110101_task-rest_desc-confounds_timeseries.tsv'
-confounds_out_s2 = pd.read_csv(confounds_file, sep = '\t')
 
-picked_confounds = np.loadtxt('confounds.txt', dtype = 'str')
 
-imputer = SimpleImputer(strategy='mean')
-confounds_out_s1 = pd.DataFrame(imputer.fit_transform(confounds_out_s1), columns=confounds_out_s1.columns)[picked_confounds[1:]]
-confounds_out_s2 = pd.DataFrame(imputer.fit_transform(confounds_out_s2), columns=confounds_out_s2.columns)[picked_confounds[1:]]
+
 
