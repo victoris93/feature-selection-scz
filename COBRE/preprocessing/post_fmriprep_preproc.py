@@ -24,31 +24,59 @@ def get_sessions(subject, data = data_path):
             session_names.append(subdir[4:])
     return session_names
 
-def get_confounds(subject, session_names):
+def impute_nans(dataframe, pick_columns = None):
+    imputer = SimpleImputer(strategy='mean')
+    if pick_columns != None:
+        df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)[pick_columns]
+    else:
+        df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)
+    return df_no_nans
+
+def get_confounds(subject, session_names, no_nans = True):
+    confounds = []
     confounds_file_ses1 = f'sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}_task-rest_desc-confounds_timeseries.tsv'
     confounds_out_s1 = pd.read_csv(confounds_file_ses1, sep = '\t')
+    if no_nans == True:
+        confounds_out_s1 = impute_nans(confounds_out_s1)
+    confounds.append(confounds_out_s1)
     if len(session_names) > 1:
         confounds_file_ses2 = f'sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}_task-rest_desc-confounds_timeseries.tsv'
         confounds_out_s2 = pd.read_csv(confounds_file_ses2, sep = '\t')
+        if no_nans == True:
+            confounds_out_s2 = impute_nans(confounds_out_s2)
+        confounds.append(confounds_out_s2)
     else:
         confounds_out_s2 = None
-    return confounds_out_s1, confounds_out_s2
+    return confounds
 
-def parcellate(subject_paths, confounds, parcellation = 'schaefer'):
+def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer'):
+    parc_ts = []
     schaefer_atlas = datasets.fetch_atlas_schaefer_2018(n_rois=400, yeo_networks=7, resolution_mm=1, data_dir=None, base_url=None, resume=True, verbose=1)
     schaefer_masker =  NiftiLabelsMasker(labels_img=schaefer_atlas.maps, standardize=True, memory='nilearn_cache', verbose=5)
-    clean_ts_s1 = schaefer_masker.fit_transform(subj_ts_s1, confounds = confounds_out_s1)
-    clean_ts_s2 = schaefer_masker.fit_transform(subj_ts_s2, confounds = confounds_out_s2)
-    
+    parc_ts_s1 = schaefer_masker.fit_transform(subject_ts_paths[0], confounds = confounds[0])
+    parc_ts.append(parc_ts_s1)
+    if len(confounds) > 1:
+        parc_ts_s2 = schaefer_masker.fit_transform(subject_ts_paths[1], confounds = confounds[1])
+        parc_ts.append(parc_ts_s2)
+    return parc_ts
+
+def clean_signal(parc_ts_list):
+    clean_ts = []
+    clean_ts_s1 = signal.clean(parc_ts_list[0], t_r = 2, low_pass=0.08, high_pass=0.01, standardize=True, detrend=True)
+    clean_ts.append(clean_ts_s1)
+    if len(parc_ts_list) > 1:
+        clean_ts_s2 = signal.clean(parc_ts_list[1], t_r = 2, low_pass=0.08, high_pass=0.01, standardize=True, detrend=True)
+        clean_ts.append(clean_ts_s2)
+    return clean_ts
 
 session_names = get_sessions(subject)
 
-subj_ts_paths = []
+subject_ts_paths = []
 subj_ts_s1 = f'sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
-subj_ts_paths.append(subj_ts_s1)
-if session_names > 1:
+subject_ts_paths.append(subj_ts_s1)
+if len(session_names) > 1:
     subj_ts_s2 = f'sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
-    subj_ts_paths.append(subj_ts_s2)
+    subject_ts_paths.append(subj_ts_s2)
 
 
 confounds_file = 'sub-A00018979/ses-20100101/func/sub-A00018979_ses-20100101_task-rest_desc-confounds_timeseries.tsv'
