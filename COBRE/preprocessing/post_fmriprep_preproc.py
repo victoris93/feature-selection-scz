@@ -50,7 +50,6 @@ def get_confounds(subject, no_nans = True, pick_columns = None, data_dir = data_
         for confounds_path in confound_paths:
             confounds = pd.read_csv(confounds_path, sep = '\t')
             confound_list.append(confounds)
-    print(confounds)
     return confound_list
 
 def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', gsr = False):
@@ -87,7 +86,7 @@ def get_ts_paths(subject, data_dir = data_path):
 
 session_names = get_sessions(subject)
 picked_confounds = np.loadtxt('confounds.txt', dtype = 'str')
-confounds = get_confounds(subject, session_names, pick_columns = picked_confounds)
+confounds = get_confounds(subject, pick_columns = picked_confounds)
 subject_ts_paths = get_ts_paths(subject)
 
 parcellated_ts = parcellate(subject_ts_paths, confounds)
@@ -100,3 +99,8 @@ if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 np.save(file = f'{output_dir}/sub-{subject}_task-rest_space-MNI152NLin2009cAsym_res-2_desc-clean_bold', arr = clean_parcellated_ts)
+
+
+def get_confounds(no_nans = True):
+    if no_nans == True:
+        print("No nans is true")
