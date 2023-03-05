@@ -23,68 +23,72 @@ def get_sessions(subject, data = data_path):
             session_names.append(subdir[4:])
     return session_names
 
-def impute_nans(dataframe, pick_columns = None, gsr = False):
+def impute_nans(dataframe, pick_columns = None):
     imputer = SimpleImputer(strategy='mean')
     if pick_columns is not None and isinstance(pick_columns, (list, np.ndarray)):
-        if gsr == False:
-            df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)[pick_columns[1:]]
-        else:
-            df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)[pick_columns]
+        df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)[pick_columns]
     else:
         df_no_nans = pd.DataFrame(imputer.fit_transform(dataframe), columns=dataframe.columns)
     return df_no_nans
 
-def get_confounds(subject, session_names, no_nans = True, pick_columns = None):
-    confounds = []
-    confounds_file_ses1 = f'{data_path}/derivatives/fmriprep/sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}_task-rest_desc-confounds_timeseries.tsv'
-    confounds_out_s1 = pd.read_csv(confounds_file_ses1, sep = '\t')
+def get_confounds(subject, no_nans = True, pick_columns = None, data_dir = data_path):
+    confound_paths = []
+    confound_list = []
+    session_names = get_sessions(subject)
+    subject_dir = os.path.join(data_dir, 'derivatives', 'fmriprep', f'sub-{subject}')
+    for session_name in session_names:
+        session_dir = os.path.join(subject_dir, f'ses-{session_name}', 'func')
+        if os.path.exists(session_dir):
+            confound_files = [os.path.join(session_dir, f) for f in os.listdir(session_dir) if f.endswith('confounds_timeseries.tsv')]
+            confound_paths.extend(confound_files)
     if no_nans == True:
-        confounds_out_s1 = impute_nans(confounds_out_s1, pick_columns = pick_columns)
-    confounds.append(confounds_out_s1)
-    if len(session_names) > 1:
-        confounds_file_ses2 = f'{data_path}/derivatives/fmriprep/sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}_task-rest_desc-confounds_timeseries.tsv'
-        confounds_out_s2 = pd.read_csv(confounds_file_ses2, sep = '\t')
-        if no_nans == True:
-            confounds_out_s2 = impute_nans(confounds_out_s2, pick_columns = pick_columns)
-        confounds.append(confounds_out_s2)
+        for confounds_path in confound_paths:
+            confounds = pd.read_csv(confounds_path, sep = '\t')
+            confounds = impute_nans(confounds, pick_columns = pick_columns)
+            confound_list.append(confounds)
     else:
-        confounds_out_s2 = None
-    return confounds
+        for confounds_path in confound_paths:
+            confounds = pd.read_csv(confounds_path, sep = '\t')
+            confound_list.append(confounds)
+    print(confounds)
+    return confound_list
 
-def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer'):
-    parc_ts = []
+def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', gsr = False):
+    parc_ts_list = []
     if parcellation == 'schaefer':
         atlas = datasets.fetch_atlas_schaefer_2018(n_rois=400, yeo_networks=7, resolution_mm=1, data_dir='/gpfs3/well/margulies/users/cpy397/nilearn_data', base_url= None, resume=True, verbose=1)
     masker =  NiftiLabelsMasker(labels_img=atlas.maps, standardize=True, memory='nilearn_cache', verbose=5)
-    parc_ts_s1 = masker.fit_transform(subject_ts_paths[0], confounds = confounds[0])
-    print('First ses parcellated')
-    parc_ts.append(parc_ts_s1)
-    if len(subject_ts_paths) > 1:
-        parc_ts_s2 = masker.fit_transform(subject_ts_paths[1], confounds = confounds[1])
-        print('Both ses parcellated')
-        parc_ts.append(parc_ts_s2)
-    return parc_ts
+    for subject_ts, subject_confounds in zip(subject_ts_paths, confounds):
+        if gsr == False:
+            parc_ts = masker.fit_transform(subject_ts, confounds = subject_confounds.drop("global_signal", axis = 1))
+            parc_ts_list.append(parc_ts)
+        else:
+            parc_ts = masker.fit_transform(subject_ts, confounds = subject_confounds)
+            parc_ts_list.append(parc_ts)
+    return parc_ts_list
 
 def clean_signal(parc_ts_list):
     clean_ts = []
-    clean_ts_s1 = signal.clean(parc_ts_list[0], t_r = 2, low_pass=0.08, high_pass=0.01, standardize=True, detrend=True)
-    clean_ts.append(clean_ts_s1[10:]) # discarding the first 10 volumes
-    if len(parc_ts_list) > 1:
-        clean_ts_s2 = signal.clean(parc_ts_list[1], t_r = 2, low_pass=0.08, high_pass=0.01, standardize=True, detrend=True)
-        clean_ts.append(clean_ts_s2[10:])
+    for parc_ts in parc_ts_list:
+        clean_ts_s1 = signal.clean(parc_ts, t_r = 2, low_pass=0.08, high_pass=0.01, standardize=True, detrend=True)
+        clean_ts.append(clean_ts_s1[10:]) # discarding first 10 volumes
     return clean_ts
+
+def get_ts_paths(subject, data_dir = data_path):
+    subject_dir = f'{data_dir}/derivatives/fmriprep/sub-{subject}'
+    ts_paths = []
+    session_names = get_sessions(subject)
+    for session_name in session_names:
+        session_dir = os.path.join(subject_dir, f'ses-{session_name}', 'func')
+        if os.path.exists(session_dir):
+            session_run_files = [os.path.join(session_dir, f) for f in os.listdir(session_dir) if f.endswith('MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz')]
+            ts_paths.extend(session_run_files)
+    return ts_paths
 
 session_names = get_sessions(subject)
 picked_confounds = np.loadtxt('confounds.txt', dtype = 'str')
 confounds = get_confounds(subject, session_names, pick_columns = picked_confounds)
-
-subject_ts_paths = []
-
-subj_ts_s1 = f'{data_path}/derivatives/fmriprep/sub-{subject}/ses-{session_names[0]}/func/sub-{subject}_ses-{session_names[0]}_task-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
-subject_ts_paths.append(subj_ts_s1)
-if len(session_names) > 1:
-    subj_ts_s2 = f'{data_path}/derivatives/fmriprep/sub-{subject}/ses-{session_names[1]}/func/sub-{subject}_ses-{session_names[1]}_task-rest_space-MNI152NLin2009cAsym_res-2_desc-preproc_bold.nii.gz'
-    subject_ts_paths.append(subj_ts_s2)
+subject_ts_paths = get_ts_paths(subject)
 
 parcellated_ts = parcellate(subject_ts_paths, confounds)
 clean_parcellated_ts = clean_signal(parcellated_ts)
