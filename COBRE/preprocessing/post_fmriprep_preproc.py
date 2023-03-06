@@ -95,13 +95,8 @@ clean_parcellated_ts = clean_signal(parcellated_ts)
 clean_parcellated_ts = np.stack(clean_parcellated_ts)
 print('Shape of the timeseries: ', clean_parcellated_ts.shape)
 
-output_dir = f'{data_path}/clean_data/sub-{subject}/func/schaefer{n_parcels}'
+output_dir = f'{data_path}/clean_data/schaefer{n_parcels}/sub-{subject}/func'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-np.save(file = f'{output_dir}/sub-{subject}_task-rest_space-MNI152NLin2009cAsym_res-2_desc-clean_bold', arr = clean_parcellated_ts)
-
-
-def get_confounds(no_nans = True):
-    if no_nans == True:
-        print("No nans is true")
+np.save(file = f'{output_dir}/sub-{subject}_task-rest_space-MNI152NLin2009cAsym_res-2_schaefer{n_parcels}_desc-clean_bold', arr = clean_parcellated_ts)
