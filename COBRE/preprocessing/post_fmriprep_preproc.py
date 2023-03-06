@@ -12,6 +12,7 @@ from nilearn.maskers import NiftiLabelsMasker
 subject = sys.argv[1]
 
 data_path = '/gpfs3/well/margulies/projects/data/COBRE'
+n_parcels = 1000
 
 def get_sessions(subject, data = data_path):
     data = data + '/derivatives/fmriprep'
@@ -52,7 +53,7 @@ def get_confounds(subject, no_nans = True, pick_columns = None, data_dir = data_
             confound_list.append(confounds)
     return confound_list
 
-def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', n_parcels = 400, gsr = False):
+def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', n_parcels = n_parcels, gsr = False):
     parc_ts_list = []
     if parcellation == 'schaefer':
         atlas = datasets.fetch_atlas_schaefer_2018(n_rois=n_parcels, yeo_networks=7, resolution_mm=1, data_dir='/gpfs3/well/margulies/users/cpy397/nilearn_data', base_url= None, resume=True, verbose=1)
@@ -94,7 +95,7 @@ clean_parcellated_ts = clean_signal(parcellated_ts)
 clean_parcellated_ts = np.stack(clean_parcellated_ts)
 print('Shape of the timeseries: ', clean_parcellated_ts.shape)
 
-output_dir = f'{data_path}/clean_data/sub-{subject}/func'
+output_dir = f'{data_path}/clean_data/sub-{subject}/func/schaefer{n_parcels}'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
