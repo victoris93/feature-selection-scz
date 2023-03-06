@@ -52,10 +52,10 @@ def get_confounds(subject, no_nans = True, pick_columns = None, data_dir = data_
             confound_list.append(confounds)
     return confound_list
 
-def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', gsr = False):
+def parcellate(subject_ts_paths, confounds, parcellation = 'schaefer', n_parcels = 400, gsr = False):
     parc_ts_list = []
     if parcellation == 'schaefer':
-        atlas = datasets.fetch_atlas_schaefer_2018(n_rois=400, yeo_networks=7, resolution_mm=1, data_dir='/gpfs3/well/margulies/users/cpy397/nilearn_data', base_url= None, resume=True, verbose=1)
+        atlas = datasets.fetch_atlas_schaefer_2018(n_rois=n_parcels, yeo_networks=7, resolution_mm=1, data_dir='/gpfs3/well/margulies/users/cpy397/nilearn_data', base_url= None, resume=True, verbose=1)
     masker =  NiftiLabelsMasker(labels_img=atlas.maps, standardize=True, memory='nilearn_cache', verbose=5)
     for subject_ts, subject_confounds in zip(subject_ts_paths, confounds):
         if gsr == False:
@@ -89,7 +89,7 @@ picked_confounds = np.loadtxt('confounds.txt', dtype = 'str')
 confounds = get_confounds(subject, pick_columns = picked_confounds)
 subject_ts_paths = get_ts_paths(subject)
 
-parcellated_ts = parcellate(subject_ts_paths, confounds)
+parcellated_ts = parcellate(subject_ts_paths, confounds, n_parcels = 1000)
 clean_parcellated_ts = clean_signal(parcellated_ts)
 clean_parcellated_ts = np.stack(clean_parcellated_ts)
 print('Shape of the timeseries: ', clean_parcellated_ts.shape)
