@@ -6,6 +6,7 @@ from brainspace.utils.parcellation import reduce_by_labels
 from brainspace.datasets import load_parcellation
 import hcp_utils as hcp
 
+n_regions = 400
 subject = sys.argv[1]
 
 cluster_path='/well/margulies/projects/data/hcp'
