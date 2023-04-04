@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 
 def permutation_test(X_train, y_train, beta_coefficients, i, n_permutations):
     permuted_feature = np.random.permutation(X_train[:, i])
