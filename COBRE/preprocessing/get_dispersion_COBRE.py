@@ -15,14 +15,14 @@ n_neighbours_list = np.arange(5, 505, 5)
 n_grads_list = np.arange(1, 11)
 
 for subject in scz_subjects:
-    gradients = np.expand_dims(np.load(f'{scz_path}/sub-{subject}/func/aligned_10grads_{subject}_schaefer1000.npy')[:, n_grads - 1], axis = 1)
+    gradients = np.load(f'{scz_path}/sub-{subject}/func/aligned_10grads_{subject}_schaefer1000.npy')[:, :n_grads]
     hcp_ngbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(gradients)
     distances, indices = hcp_ngbrs.kneighbors(gradients)
     subj_disp = distances.mean(axis = 1)
     np.save(f'{scz_path}/sub-{subject}/func/disp_{n_grads}_{n_neighbours}n_{subject}_schaefer1000.npy', subj_disp)
 
 for subject in control_subjects:
-    gradients = np.expand_dims(np.load(f'{controls_path}/sub-{subject}/func/aligned_10grads_{subject}_schaefer1000.npy')[:, n_grads - 1], axis = 1)
+    gradients = np.load(f'{controls_path}/sub-{subject}/func/aligned_10grads_{subject}_schaefer1000.npy')[:, :n_grads]
     hcp_ngbrs = NearestNeighbors(n_neighbors=n_neighbours, algorithm='brute').fit(gradients)
     distances, indices = hcp_ngbrs.kneighbors(gradients)
     subj_disp = distances.mean(axis = 1)
