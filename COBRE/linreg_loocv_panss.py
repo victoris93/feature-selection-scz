@@ -43,8 +43,7 @@ panss_total = pd.read_csv('COBRE_PANSS_Total.csv', index_col=0)
 X_scz_disp_norm_sub = disp_array[:len(scz_subjects)]
 y_scz = panss_total['PANSS_Total'].values
 
-# Initialize the regression model and LOOCV object
-reg = LinearRegression()
+# Initialize the LOOCV object
 loocv = LeaveOneOut()
 
 # Initialize lists to store the MSE for each fold
@@ -52,15 +51,15 @@ mse_train = []
 mse_test = []
 mae_train = []
 mae_test = []
-r2_train = []
-r2_test = []
 obs_left_out = []
 actual_scores = []
-predicted_scores = []
+predicted_scores_test = []
+predicted_scores_train = []
 
 # Loop over the LOOCV folds
 print("Fitting model...")
 for train_idx, test_idx in loocv.split(X_scz_disp_norm_sub):
+    reg = LinearRegression()
 
     # Split the data into training and testing sets
     X_train = X_scz_disp_norm_sub[train_idx]
@@ -75,26 +74,26 @@ for train_idx, test_idx in loocv.split(X_scz_disp_norm_sub):
     y_train_pred = reg.predict(X_train.reshape(len(train_idx), -1))
     y_test_pred = reg.predict(X_test.reshape(1, -1))
 
-    # Calculate the MSE, MAE, and R^2 for the training and testing data
+    # Calculate the MSE, MAE, vscode-webview://0s8407ja4lfle12o90208dp55topvghfobgfe41snmpsvsq5k2bk/2576395a-4341-442b-95d4-b87661af61d5and R^2 for the training and testing data
     mse_train.append(mean_squared_error(y_train, y_train_pred))
     mse_test.append(mean_squared_error(y_test, y_test_pred))
     mae_train.append(mean_absolute_error(y_train, y_train_pred))
     mae_test.append(mean_absolute_error(y_test, y_test_pred))
-    r2_train.append(r2_score(y_train, y_train_pred))
-    r2_test.append(r2_score(y_test, y_test_pred))
     
     # Append the index of the observation left out and the actual and predicted scores
     obs_left_out.append(test_idx[0])
     actual_scores.append(y_test[0])
-    predicted_scores.append(y_test_pred[0])
+    predicted_scores_test.append(y_test_pred[0])
+    predicted_scores_train.append(y_train_pred[0])
 
+r2_train = r2_score(actual_scores, predicted_scores_train)
+r2_test = r2_score(actual_scores, predicted_scores_test)
 # Compute the mean MSE, MAE, and R^2 across all folds for both training and testing data
 mean_mse_train = np.mean(mse_train)
 mean_mse_test = np.mean(mse_test)
 mean_mae_train = np.mean(mae_train)
 mean_mae_test = np.mean(mae_test)
-mean_r2_train = np.mean(r2_train)
-mean_r2_test = np.mean(r2_test)
+
 
 filename = 'results/linreg_loocv_disp_panss_perf.csv'
 
@@ -111,7 +110,7 @@ with open(filename, mode='a') as results_file:
 
     # Write the results for the current train and test session
     for i in range(len(mse_train)):
-        results_writer.writerow([n_grads, n_neighbours, mse_train[i], mse_test[i], mae_train[i], mae_test[i], r2_train[i], r2_test[i], obs_left_out[i], actual_scores[i], predicted_scores[i]])
+        results_writer.writerow([n_grads, n_neighbours, mse_train[i], mse_test[i], mae_train[i], mae_test[i], r2_train, r2_test, obs_left_out[i], actual_scores[i], predicted_scores_test[i]])
 
 print("Finished writing results.")
 
