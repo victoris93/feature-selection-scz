@@ -91,28 +91,28 @@ def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline 
             ax.plot(subset[f'{indep_var}'], subset[f'Mean {metric}'], label=f'{hue_indep_var}={level}')
         ax.set_xlabel(f'{indep_var}')
         ax.set_ylabel(f'Mean {metric}')
-        ax.legend()
+        ax.legend(loc='upper right')
 
     else:
-        grouped_data = perf_df.groupby([indep_var[0]]).agg({metric: ['mean', 'std']}).reset_index()
-        grouped_data.columns = [indep_var[0], f'Mean {metric}', 'Standard Deviation']
-        ax.errorbar(grouped_data[indep_var[0]], grouped_data[f'Mean {metric}'], yerr=grouped_data['Standard Deviation'], fmt='o-', capsize=5)
-        ax.axhline(baseline, color='gray', linestyle='--')
+        indep_var = indep_var[0]
+        grouped_data = perf_df.groupby([indep_var]).agg({metric: ['mean', 'std']}).reset_index()
+        grouped_data.columns = [indep_var, f'Mean {metric}', 'Standard Deviation']
+        ax.errorbar(grouped_data[indep_var], grouped_data[f'Mean {metric}'], yerr=grouped_data['Standard Deviation'], fmt='o-', capsize=5)
 
     if show_min:
-        optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmin()]
+        optim_indep = grouped_data[indep_var][grouped_data[f'Mean {metric}'].idxmin()]
         best_metric = grouped_data[f'Mean {metric}'].min()
     elif show_max:
-        optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmax()]
+        optim_indep = grouped_data[indep_var][grouped_data[f'Mean {metric}'].idxmax()]
         best_metric = grouped_data[f'Mean {metric}'].max()
     if show_min or show_max:
         ax.axvline(optim_indep, color='red', linestyle='--')
-        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var[0]} = {optim_indep:.2f}', ha='center', va='bottom')
-        
-        ax.text(0.05, 0.95, f"Best {metric} = {best_metric:.3f}", transform=ax.transAxes, fontsize=12, va='top')
-        plt.title(f'{title}')
-        plt.xlabel(indep_var[0])
-        plt.ylabel(metric)
-        plt.show()
+        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var} = {optim_indep:.2f}', ha='center', va='bottom')
+    
+    ax.axhline(baseline, color='gray', linestyle='--')
+    ax.text(0.05, 0.95, f"Best {metric} = {best_metric:.3f}", transform=ax.transAxes, fontsize=12, va='top')
+    plt.title(f'{title}')
+    plt.xlabel(indep_var)
+    plt.ylabel(metric)
 
     
