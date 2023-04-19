@@ -25,18 +25,18 @@ log_disp_single_grads = []
 
 disp_array = []
 for subject in scz_subjects:
-    disp = np.load(f'{scz_path}/sub-{subject}/func/disp_sing{n_grads}_{n_neighbours}n_{subject}_schaefer1000.npy')
+    disp = np.load(f'{scz_path}/sub-{subject}/func/disp_{n_grads}_{n_neighbours}n_{subject}_schaefer1000.npy')
     disp_array.append(disp)
 for subject in control_subjects:
-    disp = np.load(f'{controls_path}/sub-{subject}/func/disp_sing{n_grads}_{n_neighbours}n_{subject}_schaefer1000.npy')
+    disp = np.load(f'{controls_path}/sub-{subject}/func/disp_{n_grads}_{n_neighbours}n_{subject}_schaefer1000.npy')
     disp_array.append(disp)
 disp_array = np.stack(disp_array)
 
-print(f"Fitting model on gradient {n_grads} with {n_neighbours} neighbours...")
+print(f"Fitting model on a combination of {n_grads} with {n_neighbours} neighbours...")
 
 result_df = mu.fit_log_model(disp_array, y)
 result_df['N_Grads'] = n_grads
 result_df['N_Neighbours'] = n_neighbours
-result_df.to_csv(f'results/logreg_loocv_disp_sing{n_grads}_{n_neighbours}n.csv')
+result_df.to_csv(f'results/logreg_loocv_disp_{n_grads}_{n_neighbours}n.csv')
 
 print("Finished writing results.")
