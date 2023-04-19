@@ -59,8 +59,20 @@ def fit_log_model(X, y, cv='loo'):
     return perf_df
 
 
-def plot_model_perf(perf_df, indep_var, metric, title = None, baseline = 0.5, show_min = False, show_max = True):
-    fig, ax = plt.subplots(figsize=(7,6))
+def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline = 0.5, show_min = False, show_max = True):
+    '''
+    Plots the performance of a model as a function of a single independent variable.
+    perf_df: DataFrame containing the performance metrics for each value of the independent variable
+    indep_var: Name of the independent variable
+    figsize: Size of the figure (tuple)
+    metric: Name of the performance metric to plot
+    title: Title of the plot
+    baseline: Baseline performance to plot
+    show_min: If True, treats the minimum value of the performance metric as the optimal value and plots a vertical line at that point
+    show_max: If True, treats the maximum value of the performance metric as the optimal value and plots a vertical line at that point
+    '''
+
+    fig, ax = plt.subplots(figsize=figsize)
     if not isinstance(indep_var, list):
         indep_var = [indep_var]
     if len(indep_var) > 1:
@@ -87,15 +99,15 @@ def plot_model_perf(perf_df, indep_var, metric, title = None, baseline = 0.5, sh
         ax.errorbar(grouped_data[indep_var[0]], grouped_data[f'Mean {metric}'], yerr=grouped_data['Standard Deviation'], fmt='o-', capsize=5)
         ax.axhline(baseline, color='gray', linestyle='--')
 
-        if show_min:
-            optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmin()]
-            best_metric = grouped_data[f'Mean {metric}'].min()
-        elif show_max:
-            optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmax()]
-            best_metric = grouped_data[f'Mean {metric}'].max()
-        if show_min or show_max:
-            ax.axvline(optim_indep, color='red', linestyle='--')
-            ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var[0]} = {optim_indep:.2f}', ha='center', va='bottom')
+    if show_min:
+        optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmin()]
+        best_metric = grouped_data[f'Mean {metric}'].min()
+    elif show_max:
+        optim_indep = grouped_data[indep_var[0]][grouped_data[f'Mean {metric}'].idxmax()]
+        best_metric = grouped_data[f'Mean {metric}'].max()
+    if show_min or show_max:
+        ax.axvline(optim_indep, color='red', linestyle='--')
+        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var[0]} = {optim_indep:.2f}', ha='center', va='bottom')
         
         ax.text(0.05, 0.95, f"Best {metric} = {best_metric:.3f}", transform=ax.transAxes, fontsize=12, va='top')
         plt.title(f'{title}')
