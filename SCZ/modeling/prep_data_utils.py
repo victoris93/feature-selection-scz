@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import sys
 import json
+import concurrent.futures
 from nilearn.connectome import sym_matrix_to_vec
 import tqdm
 
@@ -71,8 +72,6 @@ def load_data(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbour
     data = pd.merge(data, data_csv, on='participant_id')
     data = data.drop(columns=['participant_id', 'dataset', 'path'])
     return data, data_csv
-
-import concurrent.futures
 
 def load_data_parallel(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbours = None, aligned_grads = True):
     '''
