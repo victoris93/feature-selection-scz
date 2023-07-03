@@ -18,6 +18,11 @@ diagnosis_mapping = {
     0: 0
 }
 
+def retain_top_columns(df, percentage):
+    num_cols = int(df.shape[1] * percentage)
+    top_cols = df.mean().nlargest(num_cols).index
+    return df[top_cols]
+
 def threshMat(conn,lim): # if 5th percentile, then lim=95
 	perc = np.array([np.percentile(x, lim) for x in conn])
 	# Threshold each row of the matrix by setting values below X percentile to 0
@@ -46,9 +51,14 @@ def load_data(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbour
 
     data = []
     # add progress bar
+    if feat_selection is not None:
+        if percentile is None:
+            raise ValueError("Percentile must be specified for feature selection.")
+                
     for subject in tqdm.tqdm(data_csv['participant_id']):
         root_path = data_csv[data_csv['participant_id'] == subject]['path'].values[0]
         subj_path = f'{root_path}/sub-{subject}/func'
+
         aligned = ''
         if data_type == 'grad':
             data_type = 'gradients'
@@ -58,43 +68,39 @@ def load_data(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbour
             data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
         elif data_type == 'disp' and not comb_grads:
             data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
+
         try:
             features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i][0]
             if data_type == 'conn':
                 if len(features.shape) == 3:
                     features = features[0]
-                    np.fill_diagonal(features, 5)
-                if feat_selection == 'value_percentile':
-                    features = threshMat(features, percentile)
-                    features = features[features != 0]         
+                np.fill_diagonal(features, 0)
                 features = sym_matrix_to_vec(features, discard_diagonal=True)
+
             elif data_type == 'gradients':
                 if comb_grads:
                     features = features[0,:, :n_grad].ravel()
                 elif not comb_grads:
                     features = features[0,:, n_grad - 1]
-
-            features = pd.DataFrame(features).T
-            if feat_selection is not None:
-                if percentile is None:
-                        raise ValueError("Percentile must be specified for feature selection.")
-                else:
-                    if feat_selection == 'anova_percentile':
-                        features.to_numpy()
-                        print(features.shape)
-                        features = SelectPercentile(percentile=percentile).fit_transform(features, data_csv['diagnosis'])
-                        print(features.shape)
-            
-            features["participant_id"] = subject
             data.append(features)
 
         except FileNotFoundError as e:
             print(f"Data not found for subject {subject}: {e}.")
             data_csv = data_csv[data_csv['participant_id'] != subject]
-    data = pd.concat(data,ignore_index=True, axis = 0)
-    data = pd.merge(data, data_csv, on='participant_id')
-    data = data.drop(columns=['participant_id', 'dataset', 'path'])
+
+    data = np.row_stack(data)
+    if feat_selection == 'anova_percentile':
+            print(data.shape)
+            data = SelectPercentile(percentile=percentile).fit_transform(data, data_csv['diagnosis'].values)
+            print(data.shape)
+    data = pd.DataFrame(data)
+    
+    if feat_selection == 'value_percentile':
+        data = retain_top_columns(data, percentile/100)
+    data["diagnosis"] = data_csv['diagnosis'].values
+    #data = data.dropna()
     return data, data_csv
+
 
 def load_data_parallel(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbours = None, aligned_grads = True):
     '''
