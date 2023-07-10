@@ -7,6 +7,7 @@ import json
 import concurrent.futures
 from nilearn.connectome import sym_matrix_to_vec
 from sklearn.feature_selection import SelectPercentile
+from sklearn.decomposition import PCA
 import tqdm
 
 diagnosis_mapping = {
@@ -44,7 +45,7 @@ def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping):
     data_csv["participant_id"] = data_csv["participant_id"].str.replace('sub-', '')
     return data_csv
 
-def load_data(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None):
+def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None):
     '''
     data_type: 'conn', 'disp', 'grad', 'nbs'
     '''
@@ -109,3 +110,46 @@ def load_data(data_csv, data_type, comb_grads = None, n_grad = None, n_neighbour
     data["diagnosis"] = data_csv['diagnosis'].values
     #data = data.dropna()
     return data, data_csv
+
+def load_data_pca(participants, path_to_args):
+    all_data = []
+    args = np.loadtxt(path_to_args, dtype=str)
+
+    for row in args:
+        data_type = row[0]
+        comb_grads = bool(row[1])
+
+        n_grad = row[2]
+        n_grad = None if n_grad == 'None' else int(n_grad)
+
+        n_neighbours =row[3]
+        n_neighbours = None if n_neighbours == 'None' else int(n_neighbours)
+
+        aligned_grads = bool(row[4])
+
+        feat_selection = row[5]
+        feat_selection = None if feat_selection == 'None' else feat_selection
+
+        percentile = row[6]
+        percentile = None if percentile == 'None' else float(percentile)
+
+        nbs_thresh = row[7]
+        nbs_thresh = None if nbs_thresh == 'None' else float(nbs_thresh)
+
+        nbs_dir = row[8]
+        nbs_dir = None if nbs_dir == 'None' else nbs_dir
+
+        print("Loading features for data type: ", data_type)
+        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile)
+        data = data.drop(columns=['diagnosis'])
+        all_data.append(data)
+
+    all_data = pd.concat(all_data, axis=1, ignore_index=True)
+    all_data = all_data.to_numpy()
+    pca = PCA()
+    print("Running PCA on all features...")
+    all_data = pca.fit_transform(all_data)
+    all_data = pd.DataFrame(all_data)
+    all_data["diagnosis"] = participants['diagnosis'].values
+    print("Data loaded.")
+    return all_data, participants
