@@ -1,157 +1,220 @@
 import numpy as np
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVC
-from sklearn.model_selection import LeaveOneOut, GridSearchCV
-from matplotlib import pyplot as plt
+import nilearn
 import pandas as pd
+import os
+import sys
+import json
+import concurrent.futures
+from nilearn.connectome import sym_matrix_to_vec
+from sklearn.feature_selection import SelectPercentile
+from sklearn.decomposition import PCA
+import tqdm
 
-def fit_log_model(X, y, cv='loo'):
+diagnosis_mapping = {
+    'CONTROL': 0,
+    'SCHZ': 1,
+    'Schizophrenia_Strict': 1,
+    'No_Known_Disorder': 0,
+    4: 1,
+    0: 0
+}
 
-    acc_list = []
-    prec_list = []
-    rec_list = []
-    f1_list = []
-    roc_auc_list = []
-    deviance_list = []
+sex_mapping = {
+    1: 0,
+    2: 1,
+    'M': 0,
+    'F': 1,
+    'male': 0,
+    'female': 1
+}
+
+def retain_top_columns(df, percentage):
+    num_cols = int(df.shape[1] * percentage)
+    top_cols = df.mean().nlargest(num_cols).index
+    return df[top_cols]
+
+def threshMat(conn,lim): # if 5th percentile, then lim=95
+	perc = np.array([np.percentile(x, lim) for x in conn])
+	# Threshold each row of the matrix by setting values below X percentile to 0
+	for i in range(conn.shape[0]):
+		conn[i, conn[i,:] < perc[i]] = 0   
+	return conn
+
+def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping, sex_mapping = sex_mapping):
+    data_csv = []
+    for dataset in list(data_paths.keys()):
+        participants = pd.read_csv(f'{data_paths[dataset]}/participants.tsv', sep='\t')[["participant_id", "diagnosis", 'age', 'sex']]
+        participants["dataset"] = dataset
+        participants["path"] = data_paths[dataset]
+        if (0, 1) not in participants["sex"].unique():
+            participants["sex"] = participants["sex"].map(sex_mapping)
+        if "COBRE" in participants["dataset"].unique()[0]:
+            participants["dataset"] = "COBRE"
+        data_csv.append(participants)
+
+    data_csv = pd.concat(data_csv, ignore_index=True, verify_integrity=True)
+    if diag_mapping is not None:
+        data_csv = data_csv[data_csv['diagnosis'].isin(list(diag_mapping.keys()))]
+        data_csv["diagnosis"] = data_csv["diagnosis"].map(diag_mapping)
+    data_csv["participant_id"] = data_csv["participant_id"].str.replace('sub-', '')
+    return data_csv
+
+def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None):
+    '''
+    data_type: 'conn', 'disp', 'grad', 'nbs'
+    '''
+
+    data = []
+    # add progress bar
+    if feat_selection is not None:
+        if percentile is None and nbs_thresh is None:
+            raise ValueError("Either percentile or nbs_thresh must be specified for feature selection.")
+                
+    for subject in tqdm.tqdm(data_csv['participant_id']):
+        root_path = data_csv[data_csv['participant_id'] == subject]['path'].values[0]
+        subj_path = f'{root_path}/sub-{subject}/func'
+
+        aligned = ''
+        if data_type == 'grad':
+            data_type = 'gradients'
+            if aligned_grads:
+                aligned = 'aligned'
+        if data_type == 'disp' and comb_grads:
+            data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
+        elif data_type == 'disp' and not comb_grads:
+            data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
+
+        try:
+            features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i][0]
+            if data_type == 'conn':
+                while len(features.shape) > 2:
+                    features = features[0]
+                np.fill_diagonal(features, 0)
+                features = sym_matrix_to_vec(features, discard_diagonal=True)
+                if feat_selection == 'nbs':
+                    nbs_thresh = float(nbs_thresh)
+                    if nbs_dir is None:
+                        nbs_dir = os.getcwd()
+                    adj = np.load(f'{nbs_dir}/nbs_{nbs_thresh}thresh.npy', allow_pickle=True)[1]
+                    adj = sym_matrix_to_vec(adj, discard_diagonal=True)
+                    features = features[adj != 0]
+
+            elif data_type == 'gradients':
+                if comb_grads:
+                    features = features[0,:, :n_grad].ravel()
+                elif not comb_grads:
+                    features = features[0,:, n_grad - 1]
+            elif data_type == 'nbs':
+                adj = features
+            data.append(features)
+
+        except FileNotFoundError as e:
+            print(f"Data not found for subject {subject}: {e}.")
+            data_csv = data_csv[data_csv['participant_id'] != subject]
+
+    data = np.row_stack(data)
+    if feat_selection == 'anova_percentile':
+            print(data.shape)
+            data = SelectPercentile(percentile=percentile).fit_transform(data, data_csv['diagnosis'].values)
+            print(data.shape)
+    data = pd.DataFrame(data)
     
-    if cv == 'loo':
-        cv = LeaveOneOut()
+    if feat_selection == 'value_percentile':
+        data = retain_top_columns(data, percentile/100)
+    data["diagnosis"] = data_csv['diagnosis'].values
+    #data = data.dropna()
+    return data, data_csv
 
+def parse_args(args):
+    data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = args
 
-    for train_index, test_index in cv.split(X):
-        clf = LogisticRegression(max_iter=10000)
-        X_train, X_test = X[train_index], X[test_index]
-        y_train, y_test = y[train_index], y[test_index]
+    comb_grads = None if comb_grads == "None" else bool(comb_grads)
+    n_grad = None if n_grad == 'None' else int(n_grad)
+    n_neighbours = None if n_neighbours == 'None' else int(n_neighbours)
+    aligned_grads = None if aligned_grads == 'None' else bool(aligned_grads)
+    feat_selection = None if feat_selection == 'None' else feat_selection
+    percentile = None if percentile == 'None' else float(percentile)
+    nbs_thresh = None if nbs_thresh == 'None' else float(nbs_thresh)
+    nbs_dir = None if nbs_dir == 'None' else nbs_dir
 
-        clf.fit(X_train, y_train)
+    return data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir
 
-        y_prob = clf.predict_proba(X_test)
-        y_pred = clf.predict(X_test)
-        acc = accuracy_score(y_test, y_pred)
-        prec = precision_score(y_test, y_pred, pos_label=1)
-        rec = recall_score(y_test, y_pred, pos_label=1)
-        f1 = f1_score(y_test, y_pred, pos_label=1)
-        #roc_auc = roc_auc_score(y_test, y_prob[:, 1])
-
-        log_likelihood_model = np.sum(y_test * np.log(y_prob[:, 1]) + (1 - y_test) * np.log(1 - y_prob[:, 1]))
-        log_likelihood_saturated = np.sum(y_test * np.log(np.mean(y_test)) + (1 - y_test) * np.log(1 - np.mean(y_test)))
-        deviance = -2 * (log_likelihood_model - log_likelihood_saturated)
-
-        acc_list.append(acc)
-        prec_list.append(prec)
-        rec_list.append(rec)
-        f1_list.append(f1)
-        #roc_auc_list.append(roc_auc)
-        deviance_list.append(deviance)
-        
-
-    perf_df = pd.DataFrame({
-        'Accuracy': acc_list,
-        'Precision': prec_list,
-        'Recall': rec_list,
-        'F1': f1_list,
-        #'ROC_AUC': roc_auc_list,
-        'Deviance': deviance_list
-    })
-
-    return perf_df
-
-
-def fit_svm_model(X, y, cv='loo'):
-
-    param_grid = {'C': [0.01, 0.1, 1, 10, 100],
-                  'gamma': ['scale', 'auto', 0.1, 1, 10],
-                  'kernel': ['linear', 'poly', 'rbf', 'sigmoid']}
-
-    acc_list = []
-    prec_list = []
-    rec_list = []
-    f1_list = []
-
-    if cv == 'loo':
-        cv = LeaveOneOut()
-
-    for train_index, test_index in cv.split(X):
-        clf = GridSearchCV(SVC(probability=True), param_grid)
-        X_train, X_test = X[train_index], X[test_index]
-        y_train, y_test = y[train_index], y[test_index]
-
-        clf.fit(X_train, y_train)
-
-        y_prob = clf.predict_proba(X_test)
-        y_pred = clf.predict(X_test)
-
-        acc_list.append(accuracy_score(y_test, y_pred))
-        prec_list.append(precision_score(y_test, y_pred))
-        rec_list.append(recall_score(y_test, y_pred))
-        f1_list.append(f1_score(y_test, y_pred))
-
-    perf_df = pd.DataFrame({
-        'Accuracy': acc_list,
-        'Precision': prec_list,
-        'Recall': rec_list,
-        'F1': f1_list
-    })
-
-    return perf_df
-
-
-def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline = 0.5, show_min = False, show_max = True):
-    '''
-    Plots the performance of a model as a function of a single independent variable.
-    perf_df: DataFrame containing the performance metrics for each value of the independent variable
-    indep_var: Name of the independent variable
-    figsize: Size of the figure (tuple)
-    metric: Name of the performance metric to plot
-    title: Title of the plot
-    baseline: Baseline performance to plot
-    show_min: If True, treats the minimum value of the performance metric as the optimal value and plots a vertical line at that point
-    show_max: If True, treats the maximum value of the performance metric as the optimal value and plots a vertical line at that point
-    '''
-
-    fig, ax = plt.subplots(figsize=figsize)
-    if not isinstance(indep_var, list):
-        indep_var = [indep_var]
-    if len(indep_var) > 1:
-        if len(perf_df[indep_var[0]].unique()) > len(perf_df[indep_var[1]].unique()):
-            hue_indep_var = indep_var[1]
-            indep_var = indep_var[0]
+def parse_feat_id(args):
+    args = tuple(args[:-1])
+    data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh = args
+    if 'None' not in comb_grads:
+        comb_grads = bool(comb_grads)
+        if comb_grads:
+            comb_grads = 'comb'
         else:
-            hue_indep_var = indep_var[0]
-            indep_var = indep_var[1]
-        grouped_data = perf_df.groupby([f'{hue_indep_var}', f'{indep_var}'])[f'{metric}'].agg(['mean']).reset_index()
-        grouped_data.columns = [hue_indep_var, indep_var, f'Mean {metric}']
-        for level in grouped_data[f'{hue_indep_var}'].unique():
-            # Filter the data to only include rows with this N_grads value:
-            subset = grouped_data[grouped_data[f'{hue_indep_var}'] == level]
-            # Plot a line for this N_grads value:
-            ax.plot(subset[f'{indep_var}'], subset[f'Mean {metric}'], label=f'{hue_indep_var}={level}')
-        ax.set_xlabel(f'{indep_var}')
-        ax.set_ylabel(f'Mean {metric}')
-        ax.legend(loc='lower center')
+            comb_grads = 'sing'
+    if 'None' not in aligned_grads:
+        aligned_grads = bool(aligned_grads)
+        if aligned_grads:
+            aligned_grads = 'aligned'
+        else:
+            aligned_grads = 'unaligned'
+    id_args = []
+    for arg in data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh:
+        if 'None' not in arg:
+            id_args.append(arg)
+    feature_id = '_'.join(id_args)
+    return feature_id
 
-    else:
-        indep_var = indep_var[0]
-        grouped_data = perf_df.groupby([indep_var]).agg({metric: ['mean', 'sem']}).reset_index()
-        grouped_data.columns = [indep_var, f'Mean {metric}', 'SEM']
-        ax.errorbar(grouped_data[indep_var], grouped_data[f'Mean {metric}'], yerr=grouped_data['SEM'], fmt='o-', capsize=5)
+def load_features_pca(participants, path_to_args):
+    all_data = []
+    args = np.loadtxt(path_to_args, dtype=str)
+    features_ids = []
+    for row in args:
+        data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = parse_args(row)
+        feature_id = parse_feat_id(row)
+        print("Loading features for data type: ", data_type)
+        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
+        features_ids.extend([feature_id] * len(data.columns))
+        data = data.drop(columns=['diagnosis'])
+        all_data.append(data)
 
-    if show_min:
-        optim_indep = grouped_data[indep_var][grouped_data[f'Mean {metric}'].idxmin()]
-        best_metric = grouped_data[f'Mean {metric}'].min()
-    elif show_max:
-        optim_indep = grouped_data[indep_var][grouped_data[f'Mean {metric}'].idxmax()]
-        best_metric = grouped_data[f'Mean {metric}'].max()
-    if show_min or show_max:
-        ax.axvline(optim_indep, color='red', linestyle='--')
-        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var} = {optim_indep:.2f}', ha='center', va='top')
-    
-    ax.axhline(baseline, color='gray', linestyle='--')
-    ax.text(0.05, 0.95, f"Best {metric} = {best_metric:.3f}", transform=ax.transAxes, fontsize=12, va='top')
-    plt.title(f'{title}')
-    plt.xlabel(indep_var)
-    plt.ylabel(metric)
+    all_data = pd.concat(all_data, axis=1, ignore_index=True)
+    all_data = all_data.to_numpy()
+    pca = PCA()
+    print("Running PCA on all features...")
+    all_data = pca.fit_transform(all_data)
+    all_data = pd.DataFrame(all_data)
+    all_data["diagnosis"] = participants['diagnosis'].values
+    eigenvectors = pca.components_
+    eigenvalues = pca.explained_variance_
+    print("Feature PCs loaded.")
+    return all_data, eigenvectors, eigenvalues, participants, features_ids
 
-    
+def load_all_features(participants, path_to_args):
+    all_data = []
+    args = np.loadtxt(path_to_args, dtype=str)
+    features_ids = []
+    for row in args:
+        data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = parse_args(row)
+        feature_id = parse_feat_id(row)
+        print("Loading features for data type: ", data_type)
+        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
+        features_ids.extend([feature_id] * len(data.columns))
+        data = data.drop(columns=['diagnosis'])
+        all_data.append(data)
+    all_data = pd.concat(all_data, axis=1, ignore_index=True)
+    columns = all_data.columns
+    new_columns = []
+    for i, column in tqdm.tqdm(enumerate(columns)):
+        new_columns.append(f"{column}_{features_ids[i]}")
+    all_data.columns = new_columns
+    print("Features loaded.")
+    return all_data, participants
+
+def get_n_best_features(feature_importance_matrix, n, features):
+    max_values = np.max(feature_importance_matrix, axis=1)
+    top_indices = np.argsort(-max_values)[:n]
+    best_features = features.iloc[:, top_indices]
+    return best_features
+
+def get_n_random_features(n, features):
+    feat_indices = np.random.choice(np.arange(features.shape[1]), n, replace=False)
+    random_features = features.iloc[:, feat_indices]
+    return random_features
+
