@@ -1,9 +1,9 @@
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-from sklearn.model_selection import LeaveOneOut
-from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVC
+from sklearn.model_selection import LeaveOneOut, GridSearchCV
 from matplotlib import pyplot as plt
 import pandas as pd
 
@@ -59,6 +59,45 @@ def fit_log_model(X, y, cv='loo'):
     return perf_df
 
 
+def fit_svm_model(X, y, cv='loo'):
+
+    param_grid = {'C': [0.01, 0.1, 1, 10, 100],
+                  'gamma': ['scale', 'auto', 0.1, 1, 10],
+                  'kernel': ['linear', 'poly', 'rbf', 'sigmoid']}
+
+    acc_list = []
+    prec_list = []
+    rec_list = []
+    f1_list = []
+
+    if cv == 'loo':
+        cv = LeaveOneOut()
+
+    for train_index, test_index in cv.split(X):
+        clf = GridSearchCV(SVC(probability=True), param_grid)
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        clf.fit(X_train, y_train)
+
+        y_prob = clf.predict_proba(X_test)
+        y_pred = clf.predict(X_test)
+
+        acc_list.append(accuracy_score(y_test, y_pred))
+        prec_list.append(precision_score(y_test, y_pred))
+        rec_list.append(recall_score(y_test, y_pred))
+        f1_list.append(f1_score(y_test, y_pred))
+
+    perf_df = pd.DataFrame({
+        'Accuracy': acc_list,
+        'Precision': prec_list,
+        'Recall': rec_list,
+        'F1': f1_list
+    })
+
+    return perf_df
+
+
 def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline = 0.5, show_min = False, show_max = True):
     '''
     Plots the performance of a model as a function of a single independent variable.
@@ -91,13 +130,13 @@ def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline 
             ax.plot(subset[f'{indep_var}'], subset[f'Mean {metric}'], label=f'{hue_indep_var}={level}')
         ax.set_xlabel(f'{indep_var}')
         ax.set_ylabel(f'Mean {metric}')
-        ax.legend(loc='upper right')
+        ax.legend(loc='lower center')
 
     else:
         indep_var = indep_var[0]
-        grouped_data = perf_df.groupby([indep_var]).agg({metric: ['mean', 'std']}).reset_index()
-        grouped_data.columns = [indep_var, f'Mean {metric}', 'Standard Deviation']
-        ax.errorbar(grouped_data[indep_var], grouped_data[f'Mean {metric}'], yerr=grouped_data['Standard Deviation'], fmt='o-', capsize=5)
+        grouped_data = perf_df.groupby([indep_var]).agg({metric: ['mean', 'sem']}).reset_index()
+        grouped_data.columns = [indep_var, f'Mean {metric}', 'SEM']
+        ax.errorbar(grouped_data[indep_var], grouped_data[f'Mean {metric}'], yerr=grouped_data['SEM'], fmt='o-', capsize=5)
 
     if show_min:
         optim_indep = grouped_data[indep_var][grouped_data[f'Mean {metric}'].idxmin()]
@@ -107,7 +146,7 @@ def plot_model_perf(perf_df, indep_var, metric, figsize, title = None, baseline 
         best_metric = grouped_data[f'Mean {metric}'].max()
     if show_min or show_max:
         ax.axvline(optim_indep, color='red', linestyle='--')
-        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var} = {optim_indep:.2f}', ha='center', va='bottom')
+        ax.text(optim_indep, ax.get_ylim()[0], f'{indep_var} = {optim_indep:.2f}', ha='center', va='top')
     
     ax.axhline(baseline, color='gray', linestyle='--')
     ax.text(0.05, 0.95, f"Best {metric} = {best_metric:.3f}", transform=ax.transAxes, fontsize=12, va='top')
