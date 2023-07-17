@@ -19,6 +19,15 @@ diagnosis_mapping = {
     0: 0
 }
 
+sex_mapping = {
+    1: 0,
+    2: 1,
+    'M': 0,
+    'F': 1,
+    'male': 0,
+    'female': 1
+}
+
 def retain_top_columns(df, percentage):
     num_cols = int(df.shape[1] * percentage)
     top_cols = df.mean().nlargest(num_cols).index
@@ -31,14 +40,19 @@ def threshMat(conn,lim): # if 5th percentile, then lim=95
 		conn[i, conn[i,:] < perc[i]] = 0   
 	return conn
 
-def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping):
+def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping, sex_mapping = sex_mapping):
     data_csv = []
     for dataset in list(data_paths.keys()):
-        participants = pd.read_csv(f'{data_paths[dataset]}/participants.tsv', sep='\t')[["participant_id", "diagnosis"]]
+        participants = pd.read_csv(f'{data_paths[dataset]}/participants.tsv', sep='\t')[["participant_id", "diagnosis", 'age', 'sex']]
         participants["dataset"] = dataset
         participants["path"] = data_paths[dataset]
+        if (0, 1) not in participants["sex"].unique():
+            participants["sex"] = participants["sex"].map(sex_mapping)
+        if "COBRE" in participants["dataset"].unique()[0]:
+            participants["dataset"] = "COBRE"
         data_csv.append(participants)
-    data_csv = pd.concat(data_csv)
+
+    data_csv = pd.concat(data_csv, ignore_index=True, verify_integrity=True)
     if diag_mapping is not None:
         data_csv = data_csv[data_csv['diagnosis'].isin(list(diag_mapping.keys()))]
         data_csv["diagnosis"] = data_csv["diagnosis"].map(diag_mapping)
@@ -111,36 +125,52 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
     #data = data.dropna()
     return data, data_csv
 
-def load_data_pca(participants, path_to_args):
+def parse_args(args):
+    data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = args
+
+    comb_grads = None if comb_grads == "None" else bool(comb_grads)
+    n_grad = None if n_grad == 'None' else int(n_grad)
+    n_neighbours = None if n_neighbours == 'None' else int(n_neighbours)
+    aligned_grads = None if aligned_grads == 'None' else bool(aligned_grads)
+    feat_selection = None if feat_selection == 'None' else feat_selection
+    percentile = None if percentile == 'None' else float(percentile)
+    nbs_thresh = None if nbs_thresh == 'None' else float(nbs_thresh)
+    nbs_dir = None if nbs_dir == 'None' else nbs_dir
+
+    return data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir
+
+def parse_feat_id(args):
+    args = tuple(args[:-1])
+    data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh = args
+    if 'None' not in comb_grads:
+        comb_grads = bool(comb_grads)
+        if comb_grads:
+            comb_grads = 'comb'
+        else:
+            comb_grads = 'sing'
+    if 'None' not in aligned_grads:
+        aligned_grads = bool(aligned_grads)
+        if aligned_grads:
+            aligned_grads = 'aligned'
+        else:
+            aligned_grads = 'unaligned'
+    id_args = []
+    for arg in data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh:
+        if 'None' not in arg:
+            id_args.append(arg)
+    feature_id = '_'.join(id_args)
+    return feature_id
+
+def load_features_pca(participants, path_to_args):
     all_data = []
     args = np.loadtxt(path_to_args, dtype=str)
-
+    features_ids = []
     for row in args:
-        data_type = row[0]
-        comb_grads = bool(row[1])
-
-        n_grad = row[2]
-        n_grad = None if n_grad == 'None' else int(n_grad)
-
-        n_neighbours =row[3]
-        n_neighbours = None if n_neighbours == 'None' else int(n_neighbours)
-
-        aligned_grads = bool(row[4])
-
-        feat_selection = row[5]
-        feat_selection = None if feat_selection == 'None' else feat_selection
-
-        percentile = row[6]
-        percentile = None if percentile == 'None' else float(percentile)
-
-        nbs_thresh = row[7]
-        nbs_thresh = None if nbs_thresh == 'None' else float(nbs_thresh)
-
-        nbs_dir = row[8]
-        nbs_dir = None if nbs_dir == 'None' else nbs_dir
-
+        data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = parse_args(row)
+        feature_id = parse_feat_id(row)
         print("Loading features for data type: ", data_type)
-        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile)
+        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
+        features_ids.extend([feature_id] * len(data.columns))
         data = data.drop(columns=['diagnosis'])
         all_data.append(data)
 
@@ -151,5 +181,40 @@ def load_data_pca(participants, path_to_args):
     all_data = pca.fit_transform(all_data)
     all_data = pd.DataFrame(all_data)
     all_data["diagnosis"] = participants['diagnosis'].values
-    print("Data loaded.")
+    eigenvectors = pca.components_
+    eigenvalues = pca.explained_variance_
+    print("Feature PCs loaded.")
+    return all_data, eigenvectors, eigenvalues, participants, features_ids
+
+def load_all_features(participants, path_to_args):
+    all_data = []
+    args = np.loadtxt(path_to_args, dtype=str)
+    features_ids = []
+    for row in args:
+        data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = parse_args(row)
+        feature_id = parse_feat_id(row)
+        print("Loading features for data type: ", data_type)
+        data, participants = load_data(participants, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
+        features_ids.extend([feature_id] * len(data.columns))
+        data = data.drop(columns=['diagnosis'])
+        all_data.append(data)
+    all_data = pd.concat(all_data, axis=1, ignore_index=True)
+    columns = all_data.columns
+    new_columns = []
+    for i, column in tqdm.tqdm(enumerate(columns)):
+        new_columns.append(f"{column}_{features_ids[i]}")
+    all_data.columns = new_columns
+    print("Features loaded.")
     return all_data, participants
+
+def get_n_best_features(feature_importance_matrix, n, features):
+    max_values = np.max(feature_importance_matrix, axis=1)
+    top_indices = np.argsort(-max_values)[:n]
+    best_features = features.iloc[:, top_indices]
+    return best_features
+
+def get_n_random_features(n, features):
+    feat_indices = np.random.choice(np.arange(features.shape[1]), n, replace=False)
+    random_features = features.iloc[:, feat_indices]
+    return random_features
+
