@@ -8,7 +8,11 @@ import concurrent.futures
 from nilearn.connectome import sym_matrix_to_vec
 from sklearn.feature_selection import SelectPercentile
 from sklearn.decomposition import PCA
+from pycaret.classification import *
 import tqdm
+import multiprocessing
+from scipy.stats import percentileofscore
+
 
 diagnosis_mapping = {
     'CONTROL': 0,
@@ -217,4 +221,42 @@ def get_n_random_features(n, features):
     feat_indices = np.random.choice(np.arange(features.shape[1]), n, replace=False)
     random_features = features.iloc[:, feat_indices]
     return random_features
+
+def fit_on_random_features(args): # parallelize
+    n_features, features, data_csv, seed = args # best_acc and best_auc are mean across all tested models
+    random_features = get_n_random_features(n_features, features)
+    random_features["diagnosis"] = data_csv["diagnosis"].values
+    experiment = setup(random_features, target = 'diagnosis', session_id = seed, verbose=False)
+    print(f"Test {seed + 1}...")
+    best_model = compare_models(n_select = 14,verbose=False)
+    performance = pull()
+    performance = performance[performance["Model"] != "Dummy Classifier"]
+    mean_acc = performance["Accuracy"].mean()
+    mean_auc = performance.loc[performance['AUC'] != 0, 'AUC'].mean()
+    return mean_acc, mean_auc
+
+def random_feature_test(n_features, features, best_acc, best_auc, data_csv, workers, n_tests = 1000): # parallelize
+    null_acc = []
+    null_auc = []
+
+    print("Fitting models on randomly picked features...")
+    if workers == -1:
+        workers = multiprocessing.cpu_count()-1
+    pool = multiprocessing.Pool(workers)
+    random_test_args = [(n_features, features, data_csv, test) for test in range(n_tests)]
+    null_dists = pool.map(fit_on_random_features, random_test_args)
+    
+    pool.close()
+    pool.join()
+    
+    for values in null_dists:
+        null_acc.append(values[0])
+        null_auc.append(values[1])
+
+    null_acc_p = percentileofscore(null_acc, best_acc) / 100
+    null_auc_p = percentileofscore(null_auc, best_auc) / 100
+
+    return null_acc_p, null_auc_p
+
+
 
