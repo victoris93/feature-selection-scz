@@ -47,23 +47,33 @@ def threshMat(conn,lim): # if 5th percentile, then lim=95
 		conn[i, conn[i,:] < perc[i]] = 0   
 	return conn
 
-def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping, sex_mapping = sex_mapping):
+def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping):
     data_csv = []
     for dataset in list(data_paths.keys()):
         participants = pd.read_csv(f'{data_paths[dataset]}/participants.tsv', sep='\t')[["participant_id", "diagnosis", 'age', 'sex']]
         participants["dataset"] = dataset
         participants["path"] = data_paths[dataset]
-        if (0, 1) not in participants["sex"].unique():
-            participants["sex"] = participants["sex"].map(sex_mapping)
         if "COBRE" in participants["dataset"].unique()[0]:
             participants["dataset"] = "COBRE"
         data_csv.append(participants)
-
     data_csv = pd.concat(data_csv, ignore_index=True, verify_integrity=True)
+    if (0, 1) not in data_csv["sex"].unique():
+            data_csv["sex"] = data_csv["sex"].replace(1, 0)
+            data_csv["sex"] = data_csv["sex"].replace('M', 0)
+            data_csv["sex"] = data_csv["sex"].replace('F', 1)
+            data_csv["sex"] = data_csv["sex"].replace('male', 0)
+            data_csv["sex"] = data_csv["sex"].replace('female', 1)
+            data_csv["sex"] = data_csv["sex"].replace(2, 1)
     if diag_mapping is not None:
         data_csv = data_csv[data_csv['diagnosis'].isin(list(diag_mapping.keys()))]
         data_csv["diagnosis"] = data_csv["diagnosis"].map(diag_mapping)
     data_csv["participant_id"] = data_csv["participant_id"].str.replace('sub-', '')
+    for row in data_csv.iloc:
+        subject = row["participant_id"]
+        subj_path = f'{row["path"]}/sub-{subject}/func'
+        if not os.path.exists(subj_path):
+            data_csv = data_csv[data_csv['participant_id'] != subject]
+            
     return data_csv
 
 def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None, format = 'numpy'):
@@ -212,16 +222,26 @@ def load_all_features(data_csv, path_to_args):
     print("Features loaded.")
     return all_data, data_csv
 
-def get_n_best_features(feature_importance_matrix, n, features):
+def get_n_best_features(feature_importance_matrix, n, features, feature_labels):
+    feature_importance_matrix = feature_importance_matrix
     max_values = np.max(feature_importance_matrix, axis=1)
     top_indices = np.argsort(-max_values)[:n]
     best_features = features.iloc[:, top_indices]
+    feature_labels = feature_labels[top_indices]
+    best_features.columns = feature_labels
     return best_features
 
 def get_n_random_features(n, features):
     feat_indices = np.random.choice(np.arange(features.shape[1]), n, replace=False)
     random_features = features.iloc[:, feat_indices]
     return random_features
+
+def fit_on_best_features(best_features):
+    experiment = setup(best_features, target = 'diagnosis', session_id = 1, verbose=False)
+    best_fit = compare_models(verbose=False)
+    best_fit = pull()
+    del experiment
+    return best_fit
 
 def fit_on_random_features(args): # parallelize
     n_features, features, data_csv, seed = args # best_acc and best_auc are mean across all tested models
@@ -231,9 +251,16 @@ def fit_on_random_features(args): # parallelize
     print(f"Test {seed + 1}...")
     best_model = compare_models(n_select = 14,verbose=False)
     performance = pull()
-    performance = performance[performance["Model"] != "Dummy Classifier"]
+    del best_model
+    del experiment
+    dummy_acc = performance[performance["Model"] == "Dummy Classifier"]["Accuracy"].values[0]
+    dummy_auc = performance[performance["Model"] == "Dummy Classifier"]["AUC"].values[0]
+
+    performance = performance[performance["Accuracy"] > dummy_acc]
     mean_acc = performance["Accuracy"].mean()
-    mean_auc = performance.loc[performance['AUC'] != 0, 'AUC'].mean()
+    performance = performance[performance["AUC"] > dummy_auc]
+    mean_auc = performance["AUC"].mean()
+
     return mean_acc, mean_auc
 
 def random_feature_test(n_features, features, best_acc, best_auc, data_csv, workers, n_tests = 1000): # parallelize
