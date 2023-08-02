@@ -249,9 +249,9 @@ def fit_on_random_features(args): # parallelize
     random_features["diagnosis"] = data_csv["diagnosis"].values
     experiment = setup(random_features, target = 'diagnosis', session_id = seed, verbose=False)
     print(f"Test {seed + 1}...")
-    best_model = compare_models(n_select = 14,verbose=False)
+    lr = create_model('lr')
     performance = pull()
-    del best_model
+    del lr
     del experiment
     dummy_acc = performance[performance["Model"] == "Dummy Classifier"]["Accuracy"].values[0]
     dummy_auc = performance[performance["Model"] == "Dummy Classifier"]["AUC"].values[0]
@@ -281,8 +281,8 @@ def random_feature_test(n_features, features, best_acc, best_auc, data_csv, work
         null_acc.append(values[0])
         null_auc.append(values[1])
 
-    null_acc_p = percentileofscore(null_acc, best_acc) / 100
-    null_auc_p = percentileofscore(null_auc, best_auc) / 100
+    null_acc_p = 1 - percentileofscore(null_acc, best_acc) / 100
+    null_auc_p = 1 - percentileofscore(null_auc, best_auc) / 100
 
     return null_acc_p, null_auc_p
 
