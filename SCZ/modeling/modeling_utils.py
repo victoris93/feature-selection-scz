@@ -9,6 +9,8 @@ from nilearn.connectome import sym_matrix_to_vec
 from sklearn.feature_selection import SelectPercentile
 from sklearn.decomposition import PCA
 from pycaret.classification import *
+from brainspace.datasets import load_parcellation
+from brainspace.utils.parcellation import map_to_labels
 import tqdm
 import multiprocessing
 from scipy.stats import percentileofscore
@@ -310,3 +312,50 @@ def aggregate_data(data_csv, path_to_args):
             np.save("feature_labels", feature_labels)
             print(feature_labels.shape)
     print(f"Features aggregated in all_features.npy ({all_features.shape}), labels in feature_labels.npy ({feature_labels.shape})")
+
+def get_grads_from_features(df):
+    grads = []
+    #only keep the columns that are gradients
+    for column in df.columns:
+        if "grad" in column:
+            value_index = int(column.split("_")[-1])
+            i_grad = int(value_index/1000)
+            grads.append(i_grad)
+        grads = np.array(grads)
+    return grads
+
+def get_feature_regions(df, surf = True):
+    grad_indices = []
+    region_indices = []
+
+    for column in df.columns:
+        value_index = int(column.split("_")[-1])
+        i_grad = int(value_index/1000)
+        i_region = int(str(value_index)[-3:])
+        grad_indices.append(i_grad)
+        region_indices.append(i_region)
+
+    regions_grads = df = pd.DataFrame(np.zeros((1000, 200)))
+
+    feat_indices = regions_grads.stack().reset_index()
+    feat_indices.columns = ["i_row", "i_column", "value"]
+    feat_indices = feat_indices[["i_row", "i_column"]].to_numpy().tolist()
+
+    for i_row, i_column in feat_indices:
+        if i_row in region_indices and i_column in grad_indices:
+            regions_grads.iloc[i_row, i_column] = 1
+
+    regions = regions_grads.sum(axis = 1).values
+    if surf:
+        schaefer_labels_1000 = load_parcellation('schaefer', scale=1000, join=True)
+        regions = map_to_labels(regions, schaefer_labels_1000, mask=schaefer_labels_1000 != 0, fill=np.nan)
+    return regions
+
+def get_additional_regions(df_new, df_prev, surf = True):
+    regions_new = get_feature_regions(df_new, False)
+    regions_prev = get_feature_regions(df_prev, False)
+    reg_add = np.where((regions_new > 0) & (regions_prev > 0), 0, regions_new)
+    if surf:
+        schaefer_labels_1000 = load_parcellation('schaefer', scale=1000, join=True)
+        reg_add = map_to_labels(reg_add, schaefer_labels_1000, mask=schaefer_labels_1000 != 0, fill=np.nan)
+    return reg_add
