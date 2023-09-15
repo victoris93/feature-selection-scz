@@ -1,10 +1,10 @@
 #!/bin/bash 
-#SBATCH --job-name=GetDispersion
-#SBATCH -o ./logs/GetDispersion-%j.out
+#SBATCH --job-name=Dispersion
+#SBATCH -o ./logs/Dispersion-%j.out
 #SBATCH -p short
 #SBATCH --constraint="skl-compat"
-#SBATCH --cpus-per-task=2
-#SBATCH --array 1-1000:1
+#SBATCH --cpus-per-task=1
+#SBATCH --array 1-100001:1
 
 ARG_LIST=./disp_params.txt
 
@@ -17,6 +17,5 @@ echo the job id is $SLURM_ARRAY_JOB_ID
 N_GRADS=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $ARG_LIST | awk '{print $1}')
 N_NEIGHBOURS=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $ARG_LIST | awk '{print $2}')
 
-echo Computing dispersion from $N_GRADS gradients and $N_NEIGHBOURS closest neighbours
-
-python3 -u get_dispersion_COBRE.py $N_GRADS $N_NEIGHBOURS
+echo Computing dispersion from $1 $N_GRADS gradient and $N_NEIGHBOURS closest neighbours
+python3 -u compute_dispersion.py $N_GRADS $N_NEIGHBOURS $1 $2
