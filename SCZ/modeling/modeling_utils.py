@@ -80,7 +80,7 @@ def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping):
 
 def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None, format = 'numpy'):
     '''
-    data_type: 'conn', 'disp', 'grad', 'nbs'
+    data_type: 'conn', 'disp', 'grad', 'nbs', 'eigen'
     '''
 
     data = []
@@ -102,6 +102,8 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
             data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
         elif data_type == 'disp' and not comb_grads:
             data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
+        elif data_type == "eigen":
+            data_type = "eigenval"
         try:
             features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i][0]
             if data_type == 'conn':
@@ -225,7 +227,6 @@ def load_all_features(data_csv, path_to_args):
     return all_data, data_csv
 
 def get_n_best_features(feature_importance_matrix, n, features, feature_labels):
-    feature_importance_matrix = feature_importance_matrix
     max_values = np.max(feature_importance_matrix, axis=1)
     top_indices = np.argsort(-max_values)[:n]
     best_features = features.iloc[:, top_indices]
@@ -256,7 +257,7 @@ def fit_on_random_features(args): # parallelize
     del lr
     del experiment
     dummy_acc = performance[performance["Model"] == "Dummy Classifier"]["Accuracy"].values[0]
-    dummy_auc = performance[performance["Model"] == "Dummy Classifier"]["AUC"].values[0]
+    dummy_auc = performance[performance["Model"] == "Dummy Classifier"]["F1"].values[0]
 
     performance = performance[performance["Accuracy"] > dummy_acc]
     mean_acc = performance["Accuracy"].mean()

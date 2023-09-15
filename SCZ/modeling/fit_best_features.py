@@ -10,7 +10,7 @@ diagnosis = pd.read_csv("participants.csv")['diagnosis'].values
 best_features["diagnosis"] = diagnosis
 
 performance = fit_on_best_features(best_features)
-print("Models fitted.")
+print(f"Models fitted for {n_features} features.")
 performance.drop(columns = ["Recall", "Prec.", "Kappa", "MCC", "TT (Sec)"])
 performance["N features"] = n_features
 

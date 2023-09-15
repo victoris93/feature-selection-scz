@@ -8,11 +8,23 @@ import tqdm
 
 model = sys.argv[1]
 n_features = int(sys.argv[2])
+n_iter = 1000
+
+if os.path.exists(f"results/null_dist/null_dist_{n_features}.npy"):
+    print(f"Null distribution for {n_features} features already exists. Checking shape...")
+    shape = np.load(f"results/null_dist/null_dist_{n_features}.npy").shape
+    if shape[0] == 1000:
+        print("Null distribution complete.")
+        sys.exit()
+    else:
+        print("Null distribution incomplete. Continuing...")
+        n_iter = 1000 - shape[0]
 
 data_csv = pd.read_csv("participants.csv")
-features = np.load("all_features.npy")
+features = np.load("z_all_features.npy")
 features = pd.DataFrame(features)
-for test in tqdm.tqdm(np.arange(1, 1001)):
+
+for test in tqdm.tqdm(np.arange(1, n_iter+1)):
     random_features = get_n_random_features(n_features, features)
     random_features["diagnosis"] = data_csv["diagnosis"].values
 
@@ -20,7 +32,7 @@ for test in tqdm.tqdm(np.arange(1, 1001)):
     fit = create_model(model, verbose=False)
 
     performance = pull()
-    perf =np.array((performance.loc["Mean"]["Accuracy"], performance.loc["Mean"]["AUC"]))
+    perf =np.array((performance.loc["Mean"]["Accuracy"], performance.loc["Mean"]["F1"]))
     del performance
     del fit
     del experiment
@@ -35,5 +47,3 @@ for test in tqdm.tqdm(np.arange(1, 1001)):
         print("First values: ", perf.shape)
 
 print(f"Random feature test for {n_features} features complete.")
-
-

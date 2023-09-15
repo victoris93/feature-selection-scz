@@ -1,0 +1,9 @@
+{
+"COBRE-SCZ": "/gpfs3/well/margulies/projects/data/COBRE/SCZ/derivatives/fmriprep/clean_data",
+"COBRE-controls": "/gpfs3/well/margulies/projects/data/COBRE/controls/derivatives/fmriprep/clean_data",
+"LA5c": "/gpfs3/well/margulies/projects/data/LA5c/derivatives/fmriprep/clean_data",
+"SRPBS-1600-KTT": "/gpfs3/well/margulies/projects/data/SRPBS_1600/KTT/derivatives/fmriprep/clean_data",
+"SRPBS-1600-KUT": "/gpfs3/well/margulies/projects/data/SRPBS_1600/KUT/derivatives/fmriprep/clean_data",
+"SRPBS-1600-SWA": "/gpfs3/well/margulies/projects/data/SRPBS_1600/SWA/derivatives/fmriprep/clean_data",
+"SRPBS-1600-UTO": "/gpfs3/well/margulies/projects/data/SRPBS_1600/UTO/derivatives/fmriprep/clean_data"
+} 
