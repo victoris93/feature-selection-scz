@@ -12,6 +12,7 @@ from pycaret.classification import *
 from brainspace.datasets import load_parcellation
 from brainspace.utils.parcellation import map_to_labels
 import tqdm
+from scipy.stats import zscore
 import multiprocessing
 from scipy.stats import percentileofscore
 
@@ -88,27 +89,27 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
     if feat_selection is not None:
         if percentile is None and nbs_thresh is None:
             raise ValueError("Either percentile or nbs_thresh must be specified for feature selection.")
+    aligned = ''
+    if data_type == 'grad':
+        data_type = 'gradients'
+        if aligned_grads:
+            aligned = 'aligned'
+    if data_type == 'disp' and comb_grads:
+        data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
+    elif data_type == 'disp' and not comb_grads:
+        data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
+    elif data_type == "eigen":
+        data_type = "eigenval"
                 
     for subject in data_csv['participant_id']:
         root_path = data_csv[data_csv['participant_id'] == subject]['path'].values[0]
         subj_path = f'{root_path}/sub-{subject}/func'
-
-        aligned = ''
-        if data_type == 'grad':
-            data_type = 'gradients'
-            if aligned_grads:
-                aligned = 'aligned'
-        if data_type == 'disp' and comb_grads:
-            data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
-        elif data_type == 'disp' and not comb_grads:
-            data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
-        elif data_type == "eigen":
-            data_type = "eigenval"
         try:
             features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i][0]
             if data_type == 'conn':
                 while len(features.shape) > 2:
                     features = features[0]
+                    features = zscore(features)
                 np.fill_diagonal(features, 0)
                 features = sym_matrix_to_vec(features, discard_diagonal=True)
                 if feat_selection == 'nbs':
@@ -121,9 +122,9 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
 
             elif data_type == 'gradients':
                 if comb_grads:
-                    features = features[0,:, :n_grad].ravel()
+                    features = features[:,:, :n_grad]
                 elif not comb_grads or comb_grads is None:
-                    features = features[0,:, n_grad - 1]
+                     features = features[:,:, n_grad - 1]
             elif data_type == 'nbs':
                 adj = features
             data.append(features)
@@ -133,6 +134,9 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
             data_csv = data_csv[data_csv['participant_id'] != subject]
 
     data = np.row_stack(data)
+    data = zscore(data, axis = 1)
+    if len(data.shape) > 2:
+        data = np.reshape(data, (data.shape[0], data.shape[1] * data.shape[2]))
     if feat_selection == 'anova_percentile':
             data = SelectPercentile(percentile=percentile).fit_transform(data, data_csv['diagnosis'].values)
     if format == 'pandas':
@@ -296,6 +300,7 @@ def aggregate_data(data_csv, path_to_args):
         feature_id = parse_feat_id(row)
         print("Loading features for data type: ", data_type)
         data, data_csv = load_data(data_csv, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
+        data = (data - data.mean()) / data.std() # z-score every feature type separately
         features_ids =[feature_id] * data.shape[1]
         features_ids = ["_".join([i, str(j)]) for i, j in zip(features_ids, np.arange(data.shape[1]))]
         if not os.path.exists("all_features.npy"):
