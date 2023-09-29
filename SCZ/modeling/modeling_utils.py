@@ -81,7 +81,7 @@ def prepare_data_csv(data_paths, diag_mapping = diagnosis_mapping):
 
 def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbours = None, aligned_grads = True, feat_selection = None, percentile = None, nbs_thresh = None, nbs_dir = None, format = 'numpy'):
     '''
-    data_type: 'conn', 'disp', 'grad', 'nbs', 'eigen'
+    data_type: 'conn', 'disp', 'grad', 'nbs', 'eigen', 'disp_within_bth', 'disp_between_bth'
     '''
 
     data = []
@@ -98,6 +98,10 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
         data_type = f'disp-comb-{n_grad}grad-{n_neighbours}n'
     elif data_type == 'disp' and not comb_grads:
         data_type = f'disp-sing-{n_grad}grad-{n_neighbours}n'
+    elif data_type == 'disp_within_bth':
+        data_type = 'within_net_disp_bethlehem'
+    elif data_type == 'disp_between_bth':
+        data_type = 'between_net_disp_bethlehem'
     elif data_type == "eigen":
         data_type = "eigenval"
                 
@@ -105,11 +109,10 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
         root_path = data_csv[data_csv['participant_id'] == subject]['path'].values[0]
         subj_path = f'{root_path}/sub-{subject}/func'
         try:
-            features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i][0]
+            features = [np.load(f'{subj_path}/{i}') for i in os.listdir(subj_path) if data_type in i and aligned in i and "labels" not in i][0]
             if data_type == 'conn':
                 while len(features.shape) > 2:
                     features = features[0]
-                    features = zscore(features)
                 np.fill_diagonal(features, 0)
                 features = sym_matrix_to_vec(features, discard_diagonal=True)
                 if feat_selection == 'nbs':
@@ -178,10 +181,17 @@ def parse_feat_id(args):
         else:
             aligned_grads = 'unaligned'
     id_args = []
-    for arg in data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh:
-        if 'None' not in arg:
-            id_args.append(arg)
-    feature_id = '_'.join(id_args)
+    if data_type == 'disp_within_bth':
+        networks = np.arange(1, 7+1)
+        feature_id = [f"disp_within_{i}" for i in networks]
+    elif data_type == 'disp_between_bth':
+        between_networks = ['2_5', '5_7', '1_5', '2_4', '4_6', '3_4', '1_2', '2_7', '1_7', '3_6', '4_5', '1_4', '2_6', '5_6', '1_6', '2_3', '1_3', '4_7','6_7', '3_5', '3_7']
+        feature_id = [f"disp_between_{i}" for i in between_networks]
+    elif (data_type != 'disp_between_bth') and (data_type != 'disp_within_bth'):
+        for arg in data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh:
+            if 'None' not in arg:
+                id_args.append(arg)
+        feature_id = '_'.join(id_args)
     return feature_id
 
 def load_features_pca(data_csv, path_to_args):
@@ -297,12 +307,12 @@ def aggregate_data(data_csv, path_to_args):
     args = np.loadtxt(path_to_args, dtype=str)
     for row in tqdm.tqdm(args):
         data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir = parse_args(row)
-        feature_id = parse_feat_id(row)
+        features_ids = parse_feat_id(row)
         print("Loading features for data type: ", data_type)
         data, data_csv = load_data(data_csv, data_type, comb_grads, n_grad, n_neighbours, aligned_grads, feat_selection, percentile, nbs_thresh, nbs_dir)
-        data = (data - data.mean()) / data.std() # z-score every feature type separately
-        features_ids =[feature_id] * data.shape[1]
-        features_ids = ["_".join([i, str(j)]) for i, j in zip(features_ids, np.arange(data.shape[1]))]
+        if (data_type != 'disp_between_bth') and (data_type != 'disp_within_bth'):
+            features_ids =[features_ids] * data.shape[1]
+            features_ids = ["_".join([i, str(j)]) for i, j in zip(features_ids, np.arange(data.shape[1]))]
         if not os.path.exists("all_features.npy"):
             np.save("all_features", data)
         else:
@@ -316,7 +326,6 @@ def aggregate_data(data_csv, path_to_args):
             feature_labels = np.load("feature_labels.npy")
             feature_labels = np.concatenate([feature_labels, np.array(features_ids)])
             np.save("feature_labels", feature_labels)
-            print(feature_labels.shape)
     print(f"Features aggregated in all_features.npy ({all_features.shape}), labels in feature_labels.npy ({feature_labels.shape})")
 
 def get_grads_from_features(df):
