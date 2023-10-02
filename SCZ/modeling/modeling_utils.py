@@ -253,9 +253,9 @@ def get_n_random_features(n, features):
     random_features = features.iloc[:, feat_indices]
     return random_features
 
-def fit_on_best_features(best_features):
-    experiment = setup(best_features, target = 'diagnosis', session_id = 1, verbose=False)
-    best_fit = compare_models(verbose=False)
+def fit_on_best_features(best_features, cv = True):
+    experiment = setup(best_features, target = 'diagnosis', session_id = 1, verbose=False, fold_shuffle = True)
+    best_fit = compare_models(verbose=False, cross_validation = cv) #if cv == False, the metrics are computed on the test set
     best_fit = pull()
     del experiment
     return best_fit
