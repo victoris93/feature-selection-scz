@@ -14,4 +14,4 @@ echo the job id is $SLURM_JOB_ID
 
 n_features=$(sed -n "${SLURM_ARRAY_TASK_ID}p" $ARG_LIST)
 
-python3 -u fit_best_features.py $n_features
+python3 -u fit_best_features.py $n_features $1
