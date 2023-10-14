@@ -5,7 +5,7 @@ import os
 import sys
 import json
 import concurrent.futures
-from nilearn.connectome import sym_matrix_to_vec
+from nilearn.connectome import sym_matrix_to_vec, vec_to_sym_matrix
 from sklearn.feature_selection import SelectPercentile
 from sklearn.decomposition import PCA
 from pycaret.classification import *
@@ -240,13 +240,21 @@ def load_all_features(data_csv, path_to_args):
     print("Features loaded.")
     return all_data, data_csv
 
-def get_n_best_features(feature_importance_matrix, n, features, feature_labels):
+def get_n_best_features(feature_importance_matrix, n, features, feature_label):
     max_values = np.max(feature_importance_matrix, axis=1)
     top_indices = np.argsort(-max_values)[:n]
     best_features = features.iloc[:, top_indices]
     feature_labels = feature_labels[top_indices]
     best_features.columns = feature_labels
     return best_features
+
+def conn_features_to_adj(n_features, feature_importance_mat):
+    adj_vec_Ltriagnle = np.zeros(499500)
+    max_values = np.max(feature_importance_mat, axis=1)
+    top_indices = np.argsort(-max_values)[:n_features]
+    adj_vec_Ltriagnle[top_indices] = 1
+    adj_mat = vec_to_sym_matrix(adj_vec_Ltriagnle, diagonal=np.zeros(1000))
+    return adj_mat
 
 def get_n_random_features(n, features):
     feat_indices = np.random.choice(np.arange(features.shape[1]), n, replace=False)
