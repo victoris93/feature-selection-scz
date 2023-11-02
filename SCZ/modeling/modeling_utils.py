@@ -15,6 +15,8 @@ import tqdm
 from scipy.stats import zscore
 import multiprocessing
 from scipy.stats import percentileofscore
+from sklearn.utils import shuffle
+from sklearn.metrics import check_scoring
 
 
 diagnosis_mapping = {
@@ -137,7 +139,7 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
             data_csv = data_csv[data_csv['participant_id'] != subject]
 
     data = np.row_stack(data)
-    data = zscore(data, axis = 1)
+    # data = zscore(data, axis = 1)
     if len(data.shape) > 2:
         data = np.reshape(data, (data.shape[0], data.shape[1] * data.shape[2]))
     if feat_selection == 'anova_percentile':
@@ -148,7 +150,7 @@ def load_data(data_csv, data_type, comb_grads = False, n_grad = None, n_neighbou
         if feat_selection == 'value_percentile':
             data = retain_top_columns(data, percentile/100)
         data["diagnosis"] = data_csv['diagnosis'].values
-    #data = data.dropna()
+    # data = data.dropna()
     return data, data_csv
 
 def parse_args(args):
@@ -240,9 +242,9 @@ def load_all_features(data_csv, path_to_args):
     print("Features loaded.")
     return all_data, data_csv
 
-def get_n_best_features(feature_importance_matrix, n, features, feature_label):
-    max_values = np.max(feature_importance_matrix, axis=1)
-    top_indices = np.argsort(-max_values)[:n]
+def get_n_best_features(feature_importance, n, features, feature_labels):
+    # max_values = np.max(feature_importance_matrix, axis=1)
+    top_indices = np.argsort(-feature_importance)[:n]
     best_features = features.iloc[:, top_indices]
     feature_labels = feature_labels[top_indices]
     best_features.columns = feature_labels
@@ -262,7 +264,7 @@ def get_n_random_features(n, features):
     return random_features
 
 def fit_on_best_features(best_features, cv = True):
-    experiment = setup(best_features, target = 'diagnosis', session_id = 1, verbose=False, fold_shuffle = True)
+    experiment = setup(best_features, target = 'diagnosis', session_id = 1, verbose=True, fold_shuffle = True, normalize = True, categorical_features = ["sex", "dataset"], max_encoding_ohe = -1)
     best_fit = compare_models(verbose=False, cross_validation = cv) #if cv == False, the metrics are computed on the test set
     best_fit = pull()
     del experiment
@@ -382,3 +384,23 @@ def get_additional_regions(df_new, df_prev, surf = True):
         schaefer_labels_1000 = load_parcellation('schaefer', scale=1000, join=True)
         reg_add = map_to_labels(reg_add, schaefer_labels_1000, mask=schaefer_labels_1000 != 0, fill=np.nan)
     return reg_add
+
+
+def permutation_importance_pca(model, X, y, metric='accuracy', n_repeats=30):
+    scorer = check_scoring(model, scoring=metric)
+    baseline_score = scorer(model, X, y)
+    n_features = X.shape[1]
+
+    importances = np.zeros((n_features, n_repeats))
+
+    for i in range(n_features):
+        X_permuted = X.copy()
+        for n in range(n_repeats):
+            X_permuted[:, i] = shuffle(X_permuted[:, i], random_state=n)
+            score = scorer(model, X_permuted, y)
+            importances[i, n] = baseline_score - score
+            
+    importances_mean = np.mean(importances, axis=1)
+    importances_std = np.std(importances, axis=1)
+
+    return importances_mean, importances_std, importances
