@@ -7,9 +7,15 @@ import sys
 feature_type = sys.argv[1]
 feature_type_dict = {"conn":"Connectivity", "grad":"Gradients", "disp":"Dispersion"}
 
-feature_importance = np.load("results/feature_importance_matrix.npy")
-feature_importance = np.max(feature_importance, axis = 1)
-feature_importance = (feature_importance - np.min(feature_importance)) / (np.max(feature_importance) - np.min(feature_importance))
+feature_importance_conn = np.load("results/importance_conn.npy")[0]
+#feature_importance_conn=(feature_importance_conn - np.min(feature_importance_conn)) / (np.max(feature_importance_conn) - np.min(feature_importance_conn))
+feature_importance_grad = np.load("results/importance_grad.npy")[0]
+#feature_importance_grad = (feature_importance_grad - np.min(feature_importance_grad)) / (np.max(feature_importance_grad) - np.min(feature_importance_grad))
+feature_importance_centroid_disp = np.load("results/importance_centroid_disp.npy")[0]
+feature_importance_cortex_disp = np.load("results/importance_cortex_disp.npy")[0]
+
+feature_importance = np.concatenate((feature_importance_conn, feature_importance_grad, feature_importance_centroid_disp, feature_importance_cortex_disp))
+# feature_importance = (feature_importance - np.min(feature_importance)) / (np.max(feature_importance) - np.min(feature_importance))
 labels = np.load("feature_labels.npy")
 labels = np.array([label.split("_")[0] for label in labels])
 
