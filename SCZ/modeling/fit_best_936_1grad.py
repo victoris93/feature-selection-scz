@@ -24,6 +24,7 @@ best_1grad_features = get_n_best_features(grad_feature_importance, 926, grad_fea
 best_1grad_features["diagnosis"] = participants["diagnosis"]
 best_1grad_features["age"] = participants["age"]
 best_1grad_features["sex"] = participants["sex"]
+best_1grad_features['sex'] = best_1grad_features['sex'].replace({1: 'female', 0: 'male'})
 best_1grad_features["dataset"] = participants["dataset"]
 best_1grad_features["mean_fd"] = participants["mean_fd"]                          
 

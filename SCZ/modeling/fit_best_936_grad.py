@@ -23,6 +23,7 @@ best_grad_features = get_n_best_features(grad_feature_importance, 926, grad_feat
 best_grad_features["diagnosis"] = participants["diagnosis"]
 best_grad_features["age"] = participants["age"]
 best_grad_features["sex"] = participants["sex"]
+best_grad_features['sex'] = best_grad_features['sex'].replace({1: 'female', 0: 'male'})
 best_grad_features["dataset"] = participants["dataset"]
 best_grad_features["mean_fd"] = participants["mean_fd"]                          
 
@@ -37,7 +38,7 @@ perf.to_csv("results/best_936_grad_cv.csv")
 perf = perf.sort_values(by="Accuracy", ascending=False)
 best_model = perf.iloc[0]["Model"]
 best_model = models[best_model]
-exp = setup(best_grad_features, target = "diagnosis", session_id = 123, normalize = True, categorical_feaures = ["sex", "dataset"], max_encoding_ohe = -1)
+exp = setup(best_grad_features, target = "diagnosis", session_id = 123, normalize = True, categorical_features = ["sex", "dataset"], max_encoding_ohe = -1)
 trained_model = create_model(best_model)
 perf = predict_model(trained_model)
 perf = pull()

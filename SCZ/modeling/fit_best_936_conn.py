@@ -23,6 +23,7 @@ best_conn_features = get_n_best_features(conn_feature_importance, 926, connectiv
 best_conn_features["diagnosis"] = participants["diagnosis"]
 best_conn_features["age"] = participants["age"]
 best_conn_features["sex"] = participants["sex"]
+best_conn_features['sex'] = best_conn_features['sex'].replace({1: 'female', 0: 'male'})
 best_conn_features["dataset"] = participants["dataset"]
 best_conn_features["mean_fd"] = participants["mean_fd"] 
 
@@ -36,7 +37,7 @@ perfConn.to_csv("results/best_936_conn_cv.csv")
 perfConn = perfConn.sort_values(by="Accuracy", ascending=False)
 best_model = perfConn.iloc[0]["Model"]
 best_model = models[best_model]
-exp = setup(best_conn_features, target = "diagnosis", session_id = 123, normalize = True, categorical_feaures = ["sex", "dataset"], max_encoding_ohe = -1)
+exp = setup(best_conn_features, target = "diagnosis", session_id = 123, normalize = True, categorical_features = ["sex", "dataset"], max_encoding_ohe = -1)
 trained_model = create_model(best_model)
 perf = predict_model(trained_model)
 perf = pull()

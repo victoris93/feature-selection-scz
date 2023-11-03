@@ -20,6 +20,7 @@ bth_disp_labels = np.load("feature_labels.npy")[699500:699528]
 bth_disp_features["diagnosis"] = participants["diagnosis"]
 bth_disp_features["age"] = participants["age"]
 bth_disp_features["sex"] = participants["sex"]
+bth_disp_features['sex'] = bth_disp_features['sex'].replace({1: 'female', 0: 'male'})
 bth_disp_features["dataset"] = participants["dataset"]
 bth_disp_features["mean_fd"] = participants["mean_fd"]              
 
