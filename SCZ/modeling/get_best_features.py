@@ -5,14 +5,38 @@ import os
 import json
 import sys
 
-n_features = int(sys.argv[1])
-feature_importance_matrix = np.load("results/z_feature_importance_matrix.npy")
-all_features = np.load("z_all_features.npy")
-all_features = pd.DataFrame(all_features)
-feature_labels = np.load("feature_labels.npy")
+feature_type = sys.argv[1]
+n_features = int(sys.argv[2])
 
-best_features = get_n_best_features(feature_importance_matrix, n_features, all_features, feature_labels)
-best_features.to_csv(f"best_features/{n_features}_best_features.csv", index = False)
-print(best_features.head())
+participants = pd.read_csv("participants.csv")
 
-print(f"{n_features} best features saved.")
+all_features = np.load("all_features.npy")
+feature_labels = np.load('feature_labels.npy')
+if feature_type == "conn":
+    features = all_features[:, :499500]
+    labels = feature_labels[:499500]
+elif feature_type == "grad":
+    features = all_features[:, 499500:699500]
+    labels = feature_labels[499500:699500]
+elif feature_type == "cortex_disp":
+    features = all_features[:, 699528:]
+    labels = feature_labels[699528:]
+features = pd.DataFrame(features, columns = labels)
+
+if not os.path.exists(f"best_features/{n_features}_best_features_{feature_type}.csv"):
+    feature_importance = np.load(f"results/importance_{feature_type}.npy")
+    best_features = get_n_best_features(feature_importance, n_features, features, labels)
+    best_features["diagnosis"] = participants["diagnosis"]
+    best_features["age"] = participants["age"]
+    best_features["sex"] = participants["sex"]
+    best_features['sex'] = best_features['sex'].replace({1: 'female', 0: 'male'})
+    best_features["dataset"] = participants["dataset"]
+    best_features["mean_fd"] = participants["mean_fd"]
+
+    best_features.to_csv(f"best_features/{n_features}_best_features_{feature_type}.csv", index = False)
+    print(best_features.head())
+
+    print(f"{n_features} best features saved.")
+else:
+    print(f"{n_features} best features already exist. Exiting...")
+    sys.exit()
