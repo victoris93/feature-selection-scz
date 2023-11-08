@@ -243,7 +243,7 @@ def load_all_features(data_csv, path_to_args):
     return all_data, data_csv
 
 def get_n_best_features(feature_importance, n, features, feature_labels):
-    # max_values = np.max(feature_importance_matrix, axis=1)
+    # feature_importance = np.max(feature_importance, axis=1)
     top_indices = np.argsort(-feature_importance)[:n]
     best_features = features.iloc[:, top_indices]
     feature_labels = feature_labels[top_indices]
