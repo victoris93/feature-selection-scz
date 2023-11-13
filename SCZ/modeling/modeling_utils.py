@@ -250,10 +250,9 @@ def get_n_best_features(feature_importance, n, features, feature_labels):
     best_features.columns = feature_labels
     return best_features
 
-def conn_features_to_adj(n_features, feature_importance_mat):
+def conn_features_to_adj(n_features, feature_importance):
     adj_vec_Ltriagnle = np.zeros(499500)
-    max_values = np.max(feature_importance_mat, axis=1)
-    top_indices = np.argsort(-max_values)[:n_features]
+    top_indices = np.argsort(-feature_importance)[:n_features]
     adj_vec_Ltriagnle[top_indices] = 1
     adj_mat = vec_to_sym_matrix(adj_vec_Ltriagnle, diagonal=np.zeros(1000))
     return adj_mat
