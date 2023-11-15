@@ -179,7 +179,7 @@ def parse_feat_id(args):
     if 'None' not in aligned_grads:
         aligned_grads = str2bool(aligned_grads)
         if aligned_grads:
-            aligned_grads = 'aligned'
+            aligned_grads = 'aligned'                        
         else:
             aligned_grads = 'unaligned'
     id_args = []
@@ -250,11 +250,12 @@ def get_n_best_features(feature_importance, n, features, feature_labels):
     best_features.columns = feature_labels
     return best_features
 
-def conn_features_to_avg_matrix(n_features, feature_importance, features):
+def conn_features_to_matrix(n_features, feature_importance, features, mean = True):
     vec_Ltriagnle = np.zeros(499500)
     top_indices = np.argsort(-feature_importance)[:n_features]
-    mean_conn_vec = np.mean(features.iloc[:, 499500], axis=1)
-    vec_Ltriagnle[top_indices] = mean_conn_vec[top_indices]
+    if mean == True:
+        features = np.mean(features, axis=0)
+    vec_Ltriagnle[top_indices] = features[top_indices]
     avg_matrix = vec_to_sym_matrix(vec_Ltriagnle, diagonal=np.zeros(1000))
     return avg_matrix
 
