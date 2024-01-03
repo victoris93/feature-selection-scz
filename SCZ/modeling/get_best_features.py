@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../modeling_utils.py')
 from modeling_utils import get_n_best_features
 import numpy as np
 import pandas as pd

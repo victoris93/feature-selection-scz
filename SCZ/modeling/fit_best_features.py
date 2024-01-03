@@ -1,5 +1,6 @@
-from modeling_utils import fit_on_best_features
 import sys
+sys.path.append('../modeling_utils.py')
+from modeling_utils import fit_on_best_features
 import os
 import numpy as np
 import pandas as pd

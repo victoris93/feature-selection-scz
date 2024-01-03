@@ -3,6 +3,8 @@ import nilearn
 import pandas as pd
 import os
 import pycaret
+import sys
+sys.path.append('../modeling_utils.py')
 from modeling_utils import *
 from pycaret.classification import *
 import json

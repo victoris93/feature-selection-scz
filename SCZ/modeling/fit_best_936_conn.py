@@ -3,15 +3,17 @@ import nilearn
 import pandas as pd
 import os
 import pycaret
+import sys
+sys.path.append('../modeling_utils.py')
 from modeling_utils import *
 from pycaret.classification import *
 import json
 
-print("identifying the best model; train & test on 936 best connectivity features...")
+print("identifying the best model; train & test on 936 best connfeatures...")
 
 models = json.load(open("models.json", "r"))
 participants = pd.read_csv("participants.csv")
-conn_feature_importance = np.load("results/importance_conn.npy")[0]
+conn_feature_importance = np.load("results/feature_importance_conn.npy")
 
 connectivity_features = np.load("all_features.npy")
 connectivity_features = connectivity_features[:, :499500]
@@ -31,7 +33,7 @@ del connectivity_features
 del conn_feature_importance
 del conn_labels
 
-print("Fitting the models on 936 best connectivity features...")
+print("Fitting the models on 936 best connfeatures...")
 perfConn = fit_on_best_features(best_conn_features)
 perfConn.to_csv("results/best_936_conn_cv.csv")
 perfConn = perfConn.sort_values(by="Accuracy", ascending=False)

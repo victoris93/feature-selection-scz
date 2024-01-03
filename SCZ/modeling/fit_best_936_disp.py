@@ -3,6 +3,8 @@ import nilearn
 import pandas as pd
 import os
 import pycaret
+import sys
+sys.path.append('../modeling_utils.py')
 from modeling_utils import *
 from pycaret.classification import *
 import json
@@ -11,7 +13,7 @@ print("identifying the best model; train & test on 936 best dispersion features.
 
 models = json.load(open("models.json", "r"))
 participants = pd.read_csv("participants.csv")
-disp_feature_importance = np.load("results/importance_cortex_disp.npy")[0]
+disp_feature_importance = np.load("results/feature_importance_cortex_disp.npy")
 
 disp_features = np.load("all_features.npy")
 disp_features = disp_features[:, 699528:]

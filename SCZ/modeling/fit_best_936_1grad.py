@@ -4,14 +4,16 @@ import pandas as pd
 import os
 import pycaret
 import json
+import sys
+sys.path.append('../modeling_utils.py')
 from modeling_utils import *
 from pycaret.classification import *
 
-print("identifying the best model; train & test on 936 best grad features...")
+print("identifying the best model; train & test on 926 best grad features + 10 confounds...")
 
 models = json.load(open("models.json", "r"))
 participants = pd.read_csv("participants.csv")
-grad_feature_importance = np.load("results/importance_grad.npy")[0]
+grad_feature_importance = np.load("results/feature_importance_grad.npy")
 grad_feature_importance = grad_feature_importance[:1000]
 
 grad_features = np.load("all_features.npy")
