@@ -11,3 +11,11 @@ scipy
 pickle
 neuromaps
 nilearn
+pycaret
+seaborn
+matplotlib
+hcp_utils
+surfplot
+networkx
+tqdm
+scipy
